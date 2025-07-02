@@ -17,3 +17,4 @@ Flash-Reserver es una aplicativo web diseñada para gestionar reservas de manera
 1. Clona el repositorio:
    ```bash
    git clone https://github.com/tu-usuario/Flash-Reserver.git
+2 Usar comandos en terminal: cd backend, python app.py
