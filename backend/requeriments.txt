@@ -1,0 +1,13 @@
+blinker==1.8.2
+click==8.1.7
+colorama==0.4.6
+Flask==3.0.3
+Flask-Cors==5.0.0
+itsdangerous==2.2.0
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+numpy==2.1.1
+pygame==2.6.0
+PyMySQL==1.1.1
+PythonTurtle==0.3.2
+Werkzeug==3.0.4

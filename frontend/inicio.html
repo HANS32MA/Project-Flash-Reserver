@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Reserver</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/frontend/assets/css/inicio.css">
+    <link rel="icon" href="/frontend/assets/img/logo.png" type="image/png">
+    <script type="module" src="/frontend/assets/js/auth.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4>Flash Reservas</h4>
+        </div>
+        
+        <div class="user-profile">
+            <img src="/frontend/assets/img/logo.png" alt="Foto de perfil">
+            <h5>¡Hola, Bienvenidos!</h5>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li><a href="#perfil" class="active" data-page="perfil"><i class="fas fa-user"></i> Mi Perfil</a></li>
+            <li><a href="#canchas" data-page="canchas"><i class="fas fa-futbol"></i> Canchas</a></li>
+            <li><a href="#reservas" data-page="reservas"><i class="fas fa-calendar-plus"></i> Nueva Reserva</a></li>
+            <li><a href="#mis-reservas" data-page="mis-reservas"><i class="fas fa-calendar-check"></i> Mis Reservas</a></li>
+            <li><a href="#historial" data-page="historial"><i class="fas fa-history"></i> Historial</a></li>
+            <li><a href="#contacto" data-page="contacto"><i class="fas fa-envelope"></i> Contacto</a></li>
+            <li><a href="#" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="main-header">
+            <h4 id="current-page-title">Mi Perfil</h4>
+            </a>
+        </div>
+        
+        <!-- Perfil Page -->
+        <div id="perfil" class="page active">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="profile-card">
+    <h4 class="section-title">Información Personal</h4>
+    <form id="perfilForm">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="perfilNombre" class="form-label">Nombre Completo</label>
+                    <input type="text" class="form-control" id="perfilNombre" required>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="perfilEmail" class="form-label">Correo Electrónico</label>
+                    <input type="email" class="form-control" id="perfilEmail" required>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="perfilTelefono" class="form-label">Teléfono</label>
+                    <input type="tel" class="form-control" id="perfilTelefono" required>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <button type="button" class="btn btn-outline-secondary me-md-2" id="cancelEditProfile">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+    </form>
+</div>
+                    
+                    <div class="profile-card">
+                        <h4 class="section-title">Cambiar Contraseña</h4>
+                        <form id="passwordForm">
+                            <div class="mb-3">
+                                <label for="perfilPasswordActual" class="form-label">Contraseña Actual</label>
+                                <input type="password" class="form-control" id="perfilPasswordActual" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="perfilPasswordNueva" class="form-label">Nueva Contraseña</label>
+                                <input type="password" class="form-control" id="perfilPasswordNueva" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="perfilPasswordConfirmar" class="form-label">Confirmar Nueva Contraseña</label>
+                                <input type="password" class="form-control" id="perfilPasswordConfirmar" required>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="submit" class="btn btn-primary">Cambiar Contraseña</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="profile-card">
+                        <h4 class="section-title">Preferencias</h4>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="notificacionesEmail" checked>
+                            <label class="form-check-label" for="notificacionesEmail">Notificaciones por email</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="notificacionesSMS" checked>
+                            <label class="form-check-label" for="notificacionesSMS">Notificaciones por SMS</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="recordatorios" checked>
+                            <label class="form-check-label" for="recordatorios">Recordatorios de reservas</label>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-card">
+                        <h4 class="section-title">Zona Peligrosa</h4>
+                        <p class="text-muted">Estas acciones no se pueden deshacer.</p>
+                        <button class="btn btn-outline-danger w-100 mb-2">
+                            <i class="fas fa-file-export"></i> Exportar mis datos
+                        </button>
+                        <button class="btn btn-outline-danger w-100">
+                            <i class="fas fa-user-times"></i> Eliminar mi cuenta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Canchas Page -->
+        <div id="canchas" class="page">
+            <div class="profile-card">
+                <h4 class="section-title">Nuestras Canchas</h4>
+                <p>Selecciona una cancha para realizar tu reserva.</p>
+                
+                <div class="row">
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018" class="card-img-top" alt="Cancha de Fútbol">
+                            <div class="card-body">
+                                <h5 class="card-title">Cancha de Fútbol 11</h5>
+                                <p class="card-text">Cancha profesional con césped sintético de última generación.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-ruler"></i> Dimensiones: 100m x 64m</li>
+                                    <li><i class="fas fa-users"></i> Capacidad: 22 jugadores</li>
+                                    <li><i class="fas fa-money-bill-wave"></i> Precio: $800/hr</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <a href="#reservas" class="btn btn-primary w-100" data-page="reservas" data-court="futbol11">Reservar</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <img src="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e" class="card-img-top" alt="Cancha de Tenis">
+                            <div class="card-body">
+                                <h5 class="card-title">Cancha de Tenis</h5>
+                                <p class="card-text">Cancha techada con superficie de arcilla para un mejor juego.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-ruler"></i> Dimensiones: 23.77m x 8.23m</li>
+                                    <li><i class="fas fa-users"></i> Capacidad: 4 jugadores</li>
+                                    <li><i class="fas fa-money-bill-wave"></i> Precio: $300/hr</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <a href="#reservas" class="btn btn-primary w-100" data-page="reservas" data-court="tenis">Reservar</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <img src="https://images.unsplash.com/photo-1519861531473-9200262188bf" class="card-img-top" alt="Cancha de Fútbol 5">
+                            <div class="card-body">
+                                <h5 class="card-title">Cancha de Fútbol 5</h5>
+                                <p class="card-text">Cancha para fútbol rápido con iluminación LED.</p>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-ruler"></i> Dimensiones: 40m x 20m</li>
+                                    <li><i class="fas fa-users"></i> Capacidad: 10 jugadores</li>
+                                    <li><i class="fas fa-money-bill-wave"></i> Precio: $450/hr</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <a href="#reservas" class="btn btn-primary w-100" data-page="reservas" data-court="futbol5">Reservar</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reservas Page (Nueva versión integrada) -->
+        <div id="reservas" class="page">
+            <div class="profile-card">
+                <h4 class="section-title">Nueva Reserva</h4>
+                <form id="reservaForm" class="card p-4 shadow-sm">
+                    <div class="mb-3">
+                        <label for="cancha" class="form-label">Selecciona una Cancha</label>
+                        <select class="form-select" id="cancha" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="fecha" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hora" class="form-label">Horario Disponible</label>
+                        <select class="form-select" id="hora" required></select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Confirmar Reserva</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Mis Reservas Page -->
+        <div id="mis-reservas" class="page">
+            <div class="profile-card">
+                <h4 class="section-title">Mis Reservas Activas</h4>
+                
+                <div class="search-reservas">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Buscar reservas..." id="searchReservas">
+                        <button class="btn btn-outline-secondary" type="button" id="btnSearchReservas">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showPastReservas" checked>
+                        <label class="form-check-label" for="showPastReservas">Mostrar reservas pasadas</label>
+                    </div>
+                </div>
+                
+                <div class="row" id="misReservas">
+                    <!-- Las reservas se cargarán dinámicamente aquí -->
+                </div>
+                
+                <nav aria-label="Page navigation" class="mt-4" id="paginationContainer">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1">Anterior</a>
+                        </li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">Siguiente</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Historial Page -->
+        <div id="historial" class="page">
+            <div class="profile-card">
+                <h4 class="section-title">Historial de Reservas</h4>
+                <div class="table-responsive">
+                    <table class="table" id="historialTable">
+                        <thead>
+                            <tr>
+                                <th>Cancha</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- El historial se cargará dinámicamente aquí -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <nav aria-label="Page navigation" class="mt-4" id="historialPagination">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1">Anterior</a>
+                        </li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">Siguiente</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Contacto Page -->
+        <div id="contacto" class="page">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="profile-card">
+                        <h4 class="section-title">Información de Contacto</h4>
+                        <ul class="list-unstyled">
+                            <li class="mb-3"><i class="fas fa-map-marker-alt me-2"></i> Av. Deportiva 1234, Ciudad Deportiva, CP 12345</li>
+                            <li class="mb-3"><i class="fas fa-phone me-2"></i> +52 55 1234 5678</li>
+                            <li class="mb-3"><i class="fas fa-envelope me-2"></i> info@reservacanchas.com</li>
+                            <li class="mb-3"><i class="fab fa-whatsapp me-2"></i> +52 55 8765 4321 (WhatsApp)</li>
+                        </ul>
+                        <h5 class="mt-4">Horario de Atención</h5>
+                        <ul class="list-unstyled">
+                            <li><strong>Lunes a Viernes:</strong> 8:00 AM - 10:00 PM</li>
+                            <li><strong>Sábados y Domingos:</strong> 7:00 AM - 11:00 PM</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="profile-card">
+                        <h4 class="section-title">Formulario de Contacto</h4>
+                        <form id="contactoForm">
+                            <div class="mb-3">
+                                <label for="contactoNombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="contactoNombre" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="contactoEmail" class="form-label">Correo Electrónico</label>
+                                <input type="email" class="form-control" id="contactoEmail" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="contactoAsunto" class="form-label">Asunto</label>
+                                <input type="text" class="form-control" id="contactoAsunto" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="contactoMensaje" class="form-label">Mensaje</label>
+                                <textarea class="form-control" id="contactoMensaje" rows="4" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Enviar Mensaje</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para detalles de reserva -->
+    <div class="modal fade" id="reservaDetalleModal" tabindex="-1" aria-labelledby="reservaDetalleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content modal-detalles">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="reservaDetalleModalLabel">Detalles de Reserva</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="reservaDetalleContent">
+                    <!-- Contenido dinámico de los detalles de la reserva -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="btnModificarReserva">Modificar Reserva</button>
+                    <button type="button" class="btn btn-danger" id="btnCancelarReserva">Cancelar Reserva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Al inicio del script, agregar datos del usuario simplificados
+        const usuario = {
+            nombre: "usuario",
+            email: "email@gmail.com",
+            telefono: "",
+            fotoPerfil: "/frontend/assets/img/logo.png"
+        };
+
+        // Al cargar la página, llenar los campos con los datos del usuario
+        document.addEventListener('DOMContentLoaded', function() {
+            // Llenar datos del perfil
+            document.getElementById('perfilNombre').value = usuario.nombre;
+            document.getElementById('perfilEmail').value = usuario.email;
+            document.getElementById('perfilTelefono').value = usuario.telefono;
+            
+            // Actualizar la foto y nombre en el sidebar
+            document.querySelector('.user-profile img').src = usuario.fotoPerfil;
+            document.querySelector('.user-profile h5').textContent = usuario.nombre;
+            
+            // Manejar envío del formulario de perfil
+            document.getElementById('perfilForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Validar campos
+                const nombre = document.getElementById('perfilNombre').value;
+                const email = document.getElementById('perfilEmail').value;
+                const telefono = document.getElementById('perfilTelefono').value;
+                
+                if (!nombre || !email || !telefono) {
+                    alert('Por favor complete todos los campos obligatorios');
+                    return;
+                }
+                
+                if (!validarEmail(email)) {
+                    alert('Por favor ingrese un correo electrónico válido');
+                    return;
+                }
+                
+                // Actualizar datos del usuario
+                usuario.nombre = nombre;
+                usuario.email = email;
+                usuario.telefono = telefono;
+                
+                // Actualizar la foto y nombre en el sidebar
+                document.querySelector('.user-profile h5').textContent = usuario.nombre;
+                document.querySelector('.user-profile img').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(usuario.nombre)}&background=3498db&color=fff&size=200`;
+                
+                alert('Información personal actualizada con éxito');
+            });
+            
+            // Botón para cancelar edición del perfil
+            document.getElementById('cancelEditProfile').addEventListener('click', function() {
+                document.getElementById('perfilNombre').value = usuario.nombre;
+                document.getElementById('perfilEmail').value = usuario.email;
+                document.getElementById('perfilTelefono').value = usuario.telefono;
+            });
+            
+            // Función para validar email
+            function validarEmail(email) {
+                const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return re.test(email);
+            }
+            
+            // Resto del código existente...
+        });
+
+        // Datos simulados para el ejemplo  
+        const mockReservas = [
+            {
+                id: 1,
+                cancha: "Cancha de Fútbol 5",
+                tipo: "futbol5",
+                fecha: "2023-06-15",
+                horaInicio: "18:00",
+                horaFin: "20:00",
+                duracion: 2,
+                jugadores: 8,
+                estado: "confirmada",
+                precio: 900,
+                comentarios: "Partido con amigos del trabajo",
+                fechaReserva: "2023-06-10T14:30:00"
+            },
+            {
+                id: 2,
+                cancha: "Cancha de Tenis",
+                tipo: "tenis",
+                fecha: "2023-06-17",
+                horaInicio: "16:00",
+                horaFin: "17:30",
+                duracion: 1.5,
+                jugadores: 2,
+                estado: "pendiente",
+                precio: 450,
+                comentarios: "Clase con el entrenador",
+                fechaReserva: "2023-06-12T09:15:00"
+            },
+            {
+                id: 3,
+                cancha: "Cancha de Pádel",
+                tipo: "padel",
+                fecha: "2023-06-20",
+                horaInicio: "19:00",
+                horaFin: "20:30",
+                duracion: 1.5,
+                jugadores: 4,
+                estado: "confirmada",
+                precio: 525,
+                comentarios: "Torneo interno",
+                fechaReserva: "2023-06-15T16:45:00"
+            },
+            {
+                id: 4,
+                cancha: "Cancha de Fútbol 11",
+                tipo: "futbol11",
+                fecha: "2023-06-10",
+                horaInicio: "19:00",
+                horaFin: "21:00",
+                duracion: 2,
+                jugadores: 18,
+                estado: "completada",
+                precio: 1600,
+                comentarios: "Partido de liga",
+                fechaReserva: "2023-06-05T12:20:00"
+            },
+            {
+                id: 5,
+                cancha: "Cancha de Pádel",
+                tipo: "padel",
+                fecha: "2023-06-05",
+                horaInicio: "17:00",
+                horaFin: "18:00",
+                duracion: 1,
+                jugadores: 4,
+                estado: "completada",
+                precio: 350,
+                comentarios: "",
+                fechaReserva: "2023-05-30T10:10:00"
+            }
+        ];
+
+        // Precios de las canchas
+        const preciosCanchas = {
+            futbol11: 800,
+            futbol5: 450,
+            tenis: 300,
+            padel: 350
+        };
+
+        // Horarios disponibles
+        const horariosDisponibles = [
+            "08:00", "09:00", "10:00", "11:00", "12:00", 
+            "13:00", "14:00", "15:00", "16:00", "17:00", 
+            "18:00", "19:00", "20:00", "21:00"
+        ];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar modales de Bootstrap
+            const reservaDetalleModal = new bootstrap.Modal(document.getElementById('reservaDetalleModal'));
+            
+            // Manejar navegación entre páginas
+            const navLinks = document.querySelectorAll('[data-page]');
+            const pages = document.querySelectorAll('.page');
+            const pageTitle = document.getElementById('current-page-title');
+            
+            // Mapeo de títulos de página
+            const pageTitles = {
+                'perfil': 'Mi Perfil',
+                'canchas': 'Canchas Disponibles',
+                'reservas': 'Nueva Reserva',
+                'mis-reservas': 'Mis Reservas Activas',
+                'historial': 'Historial de Reservas',
+                'contacto': 'Contacto'
+            };
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Actualizar enlace de navegación activo
+                    document.querySelectorAll('.sidebar-menu li a').forEach(navLink => {
+                        navLink.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Mostrar página seleccionada
+                    const pageId = this.getAttribute('data-page');
+                    pages.forEach(page => {
+                        page.classList.remove('active');
+                        if (page.id === pageId) {
+                            page.classList.add('active');
+                            pageTitle.textContent = pageTitles[pageId] || 'ReservaCanchas';
+                            
+                            // Cargar datos específicos de la página si es necesario
+                            if (pageId === 'mis-reservas') {
+                                cargarReservas();
+                            } else if (pageId === 'historial') {
+                                cargarHistorial();
+                            } else if (pageId === 'reservas' && this.hasAttribute('data-court')) {
+                                // Si viene de la página de canchas, preseleccionar la cancha
+                                const courtType = this.getAttribute('data-court');
+                                document.getElementById('cancha').value = courtType;
+                                actualizarResumenReserva();
+                            }
+                        }
+                    });
+                    
+                    // Desplazarse al inicio de la página
+                    window.scrollTo(0, 0);
+                });
+            });
+            
+            // Configurar fecha mínima para reservas (hoy)
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').min = today;
+            
+            // Manejar envío de formularios
+            document.getElementById('perfilForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('Información personal actualizada con éxito');
+            });
+            
+            document.getElementById('passwordForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const nueva = document.getElementById('perfilPasswordNueva').value;
+                const confirmar = document.getElementById('perfilPasswordConfirmar').value;
+                
+                if (nueva !== confirmar) {
+                    alert('Las contraseñas no coinciden');
+                    return;
+                }
+                
+                if (nueva.length < 6) {
+                    alert('La contraseña debe tener al menos 6 caracteres');
+                    return;
+                }
+                
+                alert('Contraseña cambiada con éxito');
+                this.reset();
+            });
+            
+            document.getElementById('reservaForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Crear nueva reserva
+                const nuevaReserva = {
+                    id: mockReservas.length + 1,
+                    cancha: document.getElementById('cancha').options[document.getElementById('cancha').selectedIndex].text,
+                    tipo: document.getElementById('cancha').value,
+                    fecha: document.getElementById('fecha').value,
+                    horaInicio: document.getElementById('hora').value,
+                    duracion: parseFloat(document.getElementById('duracion').value),
+                    jugadores: parseInt(document.getElementById('jugadores').value),
+                    estado: "pendiente",
+                    precio: calcularPrecioReserva(),
+                    comentarios: document.getElementById('comentarios').value,
+                    fechaReserva: new Date().toISOString()
+                };
+                
+                // Calcular hora de fin
+                const [hora, minutos] = nuevaReserva.horaInicio.split(':').map(Number);
+                const minutosTotales = hora * 60 + minutos + nuevaReserva.duracion * 60;
+                const horaFinH = Math.floor(minutosTotales / 60);
+                const horaFinM = minutosTotales % 60;
+                nuevaReserva.horaFin = `${horaFinH.toString().padStart(2, '0')}:${horaFinM.toString().padStart(2, '0')}`;
+                
+                // Agregar a las reservas (simulando backend)
+                mockReservas.push(nuevaReserva);
+                
+                alert('Reserva creada con éxito');
+                this.reset();
+                
+                // Actualizar listado de reservas
+                cargarReservas();
+                
+                // Redirigir a Mis Reservas
+                document.querySelector('[data-page="mis-reservas"]').click();
+            });
+            
+            document.getElementById('contactoForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('Mensaje enviado con éxito. Te responderemos pronto.');
+                this.reset();
+            });
+            
+           // Botón de cierre de sesión
+            document.querySelectorAll('.logout-btn').forEach(btn => {
+                 btn.addEventListener('click', function(e) {
+                 e.preventDefault();
+                 if (confirm('¿Estás seguro que deseas cerrar sesión?')) {
+                 alert('Sesión cerrada. Redirigiendo...');
+                    // Redirigir a la página de inicio (index.html)
+                window.location.href = 'index.html';
+                 }
+            });
+        });
+            
+            // Eventos para el formulario de reserva
+            document.getElementById('cancha').addEventListener('change', actualizarResumenReserva);
+            document.getElementById('fecha').addEventListener('change', function() {
+                // Simular disponibilidad de horarios
+                actualizarHorariosDisponibles();
+                actualizarResumenReserva();
+            });
+            document.getElementById('hora').addEventListener('change', actualizarResumenReserva);
+            document.getElementById('duracion').addEventListener('change', actualizarResumenReserva);
+            document.getElementById('jugadores').addEventListener('change', actualizarResumenReserva);
+            
+            // Búsqueda de reservas
+            document.getElementById('btnSearchReservas').addEventListener('click', cargarReservas);
+            document.getElementById('searchReservas').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    cargarReservas();
+                }
+            });
+            document.getElementById('showPastReservas').addEventListener('change', cargarReservas);
+            
+            // Botón de modificar reserva en el modal
+            document.getElementById('btnModificarReserva').addEventListener('click', function() {
+                alert('Funcionalidad de modificación de reserva en desarrollo');
+            });
+            
+            // Botón de cancelar reserva en el modal
+            document.getElementById('btnCancelarReserva').addEventListener('click', function() {
+                const reservaId = parseInt(this.getAttribute('data-reserva-id'));
+                cancelarReserva(reservaId);
+                reservaDetalleModal.hide();
+            });
+            
+            // Cargar datos iniciales
+            cargarReservas();
+            cargarHistorial();
+            
+            // Función para cargar las reservas activas
+            function cargarReservas() {
+                const searchTerm = document.getElementById('searchReservas').value.toLowerCase();
+                const showPast = document.getElementById('showPastReservas').checked;
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Filtrar reservas
+                const reservasFiltradas = mockReservas.filter(reserva => {
+                    const matchesSearch = reserva.cancha.toLowerCase().includes(searchTerm) || 
+                                        reserva.comentarios.toLowerCase().includes(searchTerm);
+                    const isFutureOrToday = showPast ? true : reserva.fecha >= today;
+                    return matchesSearch && isFutureOrToday && reserva.estado !== 'completada';
+                });
+                
+                // Ordenar por fecha más próxima
+                reservasFiltradas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+                
+                // Mostrar reservas
+                const reservasContainer = document.getElementById('misReservas');
+                reservasContainer.innerHTML = '';
+                
+                if (reservasFiltradas.length === 0) {
+                    reservasContainer.innerHTML = '<div class="col-12 text-center py-5"><h5>No tienes reservas activas</h5><p>¡Haz una nueva reserva en la pestaña "Nueva Reserva"!</p></div>';
+                    document.getElementById('paginationContainer').style.display = 'none';
+                    return;
+                }
+                
+                reservasFiltradas.forEach(reserva => {
+                    const estadoClass = `estado-${reserva.estado}`;
+                    let estadoText = '';
+                    
+                    switch(reserva.estado) {
+                        case 'confirmada':
+                            estadoText = 'Confirmada';
+                            break;
+                        case 'pendiente':
+                            estadoText = 'Pendiente';
+                            break;
+                        case 'cancelada':
+                            estadoText = 'Cancelada';
+                            break;
+                        default:
+                            estadoText = reserva.estado;
+                    }
+                    
+                    const cardHtml = `
+                        <div class="col-md-6 mb-3">
+                            <div class="card reserva-card h-100" data-reserva-id="${reserva.id}">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <h5 class="card-title">${reserva.cancha}</h5>
+                                        <span class="badge-estado ${estadoClass}">${estadoText}</span>
+                                    </div>
+                                    <h6 class="card-subtitle mb-2 text-muted">${formatearFecha(reserva.fecha)}</h6>
+                                    <p class="card-text">
+                                        <i class="fas fa-clock"></i> ${reserva.horaInicio} - ${reserva.horaFin}<br>
+                                        <i class="fas fa-user-friends"></i> ${reserva.jugadores} jugadores
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-success fw-bold">$${reserva.precio.toFixed(2)} MXN</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary me-1 btn-detalles-reserva">
+                                                <i class="fas fa-info-circle"></i> Detalles
+                                            </button>
+                                            ${reserva.estado !== 'cancelada' ? `
+                                            <button class="btn btn-sm btn-outline-danger btn-cancelar-reserva">
+                                                <i class="fas fa-times"></i> Cancelar
+                                            </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    reservasContainer.innerHTML += cardHtml;
+                });
+                
+                // Agregar eventos a los botones de las nuevas tarjetas
+                document.querySelectorAll('.btn-detalles-reserva').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const reservaId = parseInt(this.closest('.card').getAttribute('data-reserva-id'));
+                        mostrarDetallesReserva(reservaId);
+                    });
+                });
+                
+                document.querySelectorAll('.btn-cancelar-reserva').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const reservaId = parseInt(this.closest('.card').getAttribute('data-reserva-id'));
+                        if (confirm('¿Estás seguro que deseas cancelar esta reserva?')) {
+                            cancelarReserva(reservaId);
+                        }
+                    });
+                });
+            }
+            
+            // Función para cargar el historial de reservas
+            function cargarHistorial() {
+                const historialCompleto = mockReservas.filter(reserva => 
+                    reserva.estado === 'completada' || reserva.estado === 'cancelada'
+                ).sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                
+                const historialTable = document.getElementById('historialTable').querySelector('tbody');
+                historialTable.innerHTML = '';
+                
+                if (historialCompleto.length === 0) {
+                    historialTable.innerHTML = '<tr><td colspan="5" class="text-center py-4">No hay reservas en tu historial</td></tr>';
+                    document.getElementById('historialPagination').style.display = 'none';
+                    return;
+                }
+                
+                historialCompleto.forEach(reserva => {
+                    let estadoBadge = '';
+                    if (reserva.estado === 'completada') {
+                        estadoBadge = '<span class="badge bg-secondary">Completada</span>';
+                    } else if (reserva.estado === 'cancelada') {
+                        estadoBadge = '<span class="badge bg-danger">Cancelada</span>';
+                    }
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${reserva.cancha}</td>
+                        <td>${formatearFecha(reserva.fecha)}</td>
+                        <td>${reserva.horaInicio} - ${reserva.horaFin}</td>
+                        <td>${estadoBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary btn-detalles-historial">
+                                <i class="fas fa-info-circle"></i> Detalles
+                            </button>
+                        </td>
+                    `;
+                    row.setAttribute('data-reserva-id', reserva.id);
+                    historialTable.appendChild(row);
+                });
+                
+                // Agregar eventos a los botones de detalles en el historial
+                document.querySelectorAll('.btn-detalles-historial').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const reservaId = parseInt(this.closest('tr').getAttribute('data-reserva-id'));
+                        mostrarDetallesReserva(reservaId);
+                    });
+                });
+            }
+            
+            // Función para mostrar los detalles de una reserva
+            function mostrarDetallesReserva(reservaId) {
+                const reserva = mockReservas.find(r => r.id === reservaId);
+                if (!reserva) return;
+                
+                let estadoBadge = '';
+                if (reserva.estado === 'confirmada') {
+                    estadoBadge = '<span class="badge-estado estado-confirmada">Confirmada</span>';
+                } else if (reserva.estado === 'pendiente') {
+                    estadoBadge = '<span class="badge-estado estado-pendiente">Pendiente</span>';
+                } else if (reserva.estado === 'cancelada') {
+                    estadoBadge = '<span class="badge-estado estado-cancelada">Cancelada</span>';
+                } else if (reserva.estado === 'completada') {
+                    estadoBadge = '<span class="badge-estado estado-completada">Completada</span>';
+                }
+                
+                const modalContent = document.getElementById('reservaDetalleContent');
+                modalContent.innerHTML = `
+                    <div class="reserva-detalle">
+                        <div class="reserva-detalle-header">
+                            <h4>${reserva.cancha}</h4>
+                            ${estadoBadge}
+                        </div>
+                        <div class="reserva-detalle-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Fecha:</strong> ${formatearFecha(reserva.fecha)}</p>
+                                    <p><strong>Hora:</strong> ${reserva.horaInicio} - ${reserva.horaFin}</p>
+                                    <p><strong>Duración:</strong> ${reserva.duracion} horas</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Jugadores:</strong> ${reserva.jugadores}</p>
+                                    <p><strong>Precio:</strong> $${reserva.precio.toFixed(2)} MXN</p>
+                                    <p><strong>Reservado el:</strong> ${formatearFechaHora(reserva.fechaReserva)}</p>
+                                </div>
+                            </div>
+                            ${reserva.comentarios ? `
+                            <div class="mt-3">
+                                <h5>Comentarios</h5>
+                                <p>${reserva.comentarios}</p>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                // Configurar botones del modal
+                const btnCancelar = document.getElementById('btnCancelarReserva');
+                btnCancelar.setAttribute('data-reserva-id', reserva.id);
+                
+                // Mostrar u ocultar botones según el estado
+                if (reserva.estado === 'cancelada' || reserva.estado === 'completada') {
+                    document.getElementById('btnModificarReserva').style.display = 'none';
+                    btnCancelar.style.display = 'none';
+                } else {
+                    document.getElementById('btnModificarReserva').style.display = 'inline-block';
+                    btnCancelar.style.display = 'inline-block';
+                }
+                
+                // Mostrar el modal
+                reservaDetalleModal.show();
+            }
+            
+            // Función para cancelar una reserva
+            function cancelarReserva(reservaId) {
+                const reservaIndex = mockReservas.findIndex(r => r.id === reservaId);
+                if (reservaIndex !== -1) {
+                    mockReservas[reservaIndex].estado = 'cancelada';
+                    alert('Reserva cancelada correctamente');
+                    
+                    // Actualizar las vistas
+                    cargarReservas();
+                    cargarHistorial();
+                }
+            }
+            
+            // Función para actualizar el resumen de la reserva
+            function actualizarResumenReserva() {
+                const canchaSelect = document.getElementById('cancha');
+                const fechaInput = document.getElementById('fecha');
+                const horaSelect = document.getElementById('hora');
+                const duracionSelect = document.getElementById('duracion');
+                const jugadoresInput = document.getElementById('jugadores');
+                
+                if (!canchaSelect.value || !fechaInput.value || !horaSelect.value || !duracionSelect.value || !jugadoresInput.value) {
+                    document.getElementById('reservaSummaryContent').innerHTML = '<p class="text-muted">Complete los datos para ver el resumen</p>';
+                    return;
+                }
+                
+                const canchaNombre = canchaSelect.options[canchaSelect.selectedIndex].text;
+                const canchaTipo = canchaSelect.value;
+                const fecha = fechaInput.value;
+                const horaInicio = horaSelect.value;
+                const duracion = parseFloat(duracionSelect.value);
+                const jugadores = parseInt(jugadoresInput.value);
+                
+                // Calcular hora de fin
+                const [hora, minutos] = horaInicio.split(':').map(Number);
+                const minutosTotales = hora * 60 + minutos + duracion * 60;
+                const horaFinH = Math.floor(minutosTotales / 60);
+                const horaFinM = minutosTotales % 60;
+                const horaFin = `${horaFinH.toString().padStart(2, '0')}:${horaFinM.toString().padStart(2, '0')}`;
+                
+                // Calcular precio
+                const precio = calcularPrecioReserva();
+                
+                // Generar resumen
+                const summaryHtml = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Cancha:</strong> ${canchaNombre}</p>
+                            <p><strong>Fecha:</strong> ${formatearFecha(fecha)}</p>
+                            <p><strong>Horario:</strong> ${horaInicio} - ${horaFin}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Duración:</strong> ${duracion} horas</p>
+                            <p><strong>Jugadores:</strong> ${jugadores}</p>
+                            <p><strong>Precio total:</strong> $${precio.toFixed(2)} MXN</p>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('reservaSummaryContent').innerHTML = summaryHtml;
+            }
+            
+            // Función para calcular el precio de la reserva
+            function calcularPrecioReserva() {
+                const canchaTipo = document.getElementById('cancha').value;
+                const duracion = parseFloat(document.getElementById('duracion').value);
+                
+                if (!canchaTipo || !duracion) return 0;
+                
+                const precioHora = preciosCanchas[canchaTipo] || 0;
+                return precioHora * duracion;
+            }
+            
+            // Función para actualizar los horarios disponibles según la fecha seleccionada
+            function actualizarHorariosDisponibles() {
+                const fechaSeleccionada = document.getElementById('fecha').value;
+                const canchaSeleccionada = document.getElementById('cancha').value;
+                
+                if (!fechaSeleccionada || !canchaSeleccionada) return;
+                
+                // Simular horarios ocupados (en un sistema real esto vendría de una API)
+                const horariosOcupados = [];
+                const diaSemana = new Date(fechaSeleccionada).getDay(); // 0=Domingo, 6=Sábado
+                
+                // Simular que los fines de semana están más ocupados
+                if (diaSemana === 0 || diaSemana === 6) {
+                    // 30% de probabilidad de que un horario esté ocupado
+                    horariosDisponibles.forEach(hora => {
+                        if (Math.random() < 0.3) {
+                            horariosOcupados.push(hora);
+                        }
+                    });
+                } else {
+                    // 15% de probabilidad entre semana
+                    horariosDisponibles.forEach(hora => {
+                        if (Math.random() < 0.15) {
+                            horariosOcupados.push(hora);
+                        }
+                    });
+                }
+                
+                // También agregar horarios ocupados por reservas existentes
+                mockReservas.forEach(reserva => {
+                    if (reserva.fecha === fechaSeleccionada && reserva.tipo === canchaSeleccionada && reserva.estado !== 'cancelada') {
+                        horariosOcupados.push(reserva.horaInicio);
+                    }
+                });
+                
+                // Actualizar el select de horas
+                const horaSelect = document.getElementById('hora');
+                horaSelect.innerHTML = '<option value="" selected disabled>Seleccione una hora</option>';
+                
+                horariosDisponibles.forEach(hora => {
+                    const estaOcupada = horariosOcupados.includes(hora);
+                    
+                    const option = document.createElement('option');
+                    option.value = hora;
+                    option.textContent = hora;
+                    option.disabled = estaOcupada;
+                    
+                    if (estaOcupada) {
+                        option.textContent += ' (No disponible)';
+                    }
+                    
+                    horaSelect.appendChild(option);
+                });
+            }
+            
+            // Funciones auxiliares para formatear fechas
+            function formatearFecha(fechaISO) {
+                const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                return new Date(fechaISO).toLocaleDateString('es-ES', opciones);
+            }
+            
+            function formatearFechaHora(fechaHoraISO) {
+                const opciones = { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                };
+                return new Date(fechaHoraISO).toLocaleDateString('es-ES', opciones);
+            }
+        });
+
+        // Código para manejar las reservas con auth.js
+        document.addEventListener('DOMContentLoaded', function() {
+            const canchaSelect = document.getElementById('cancha');
+            const fechaInput = document.getElementById('fecha');
+            const horaSelect = document.getElementById('hora');
+            const misReservasContainer = document.getElementById('misReservas');
+            const reservaForm = document.getElementById('reservaForm');
+
+            async function cargarCanchas() {
+                const canchas = await getCanchasDisponibles();
+                canchaSelect.innerHTML = '<option value="">Seleccione una cancha</option>';
+                canchas.forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.cancha_id;
+                    option.textContent = c.nombre;
+                    canchaSelect.appendChild(option);
+                });
+            }
+
+            async function cargarHorarios() {
+                const canchaId = canchaSelect.value;
+                const fecha = fechaInput.value;
+                if (!canchaId || !fecha) return;
+                const horarios = await getHorariosDisponibles(canchaId, fecha);
+                horaSelect.innerHTML = '<option value="">Seleccione un horario</option>';
+                horarios.forEach(h => {
+                    const option = document.createElement('option');
+                    option.value = h.horario_id;
+                    option.textContent = `${h.hora_inicio} - ${h.hora_fin}`;
+                    horaSelect.appendChild(option);
+                });
+            }
+
+            async function mostrarMisReservas() {
+                const reservas = await getMisReservas();
+                misReservasContainer.innerHTML = '';
+                if (reservas.length === 0) {
+                    misReservasContainer.innerHTML = '<p class="text-muted">No tienes reservas activas.</p>';
+                    return;
+                }
+                reservas.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'col-md-6';
+                    div.innerHTML = `
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">${r.cancha}</h5>
+                                <p class="card-text">
+                                    Fecha: ${r.fecha_reserva}<br>
+                                    Hora: ${r.hora_inicio} - ${r.hora_fin}<br>
+                                    Estado: ${r.estado}<br>
+                                    Código: <strong>${r.codigo_reserva}</strong>
+                                </p>
+                                ${r.estado === 'confirmada' ? `<button class="btn btn-danger btn-sm" data-id="${r.reserva_id}">Cancelar</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                    misReservasContainer.appendChild(div);
+                });
+
+                document.querySelectorAll('.btn-danger').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        if (confirm('¿Cancelar esta reserva?')) {
+                            await cancelarReserva(id);
+                            mostrarMisReservas();
+                        }
+                    });
+                });
+            }
+
+            reservaForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const cancha_id = canchaSelect.value;
+                const horario_id = horaSelect.value;
+                const fecha_reserva = fechaInput.value;
+                try {
+                    const res = await crearReserva({ cancha_id, horario_id, fecha_reserva });
+                    alert(`Reserva creada. Código: ${res.codigo_reserva}`);
+                    reservaForm.reset();
+                    mostrarMisReservas();
+                } catch (err) {
+                    alert('Error al crear reserva: ' + err.message);
+                }
+            });
+
+            canchaSelect.addEventListener('change', cargarHorarios);
+            fechaInput.addEventListener('change', cargarHorarios);
+
+            cargarCanchas();
+            mostrarMisReservas();
+        });
+    </script>
+</body>
+</html>

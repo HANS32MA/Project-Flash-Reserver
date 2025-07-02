@@ -1,0 +1,335 @@
+:root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            padding-top: 0;
+        }
+        
+        /* Sidebar styles */
+        .sidebar {
+            height: 100vh;
+            background-color: var(--primary-color);
+            color: white;
+            position: fixed;
+            width: 250px;
+            transition: all 0.3s;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .user-profile {
+            text-align: center;
+            padding: 20px 0;
+        }
+        
+        .user-profile img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+            border: 3px solid var(--secondary-color);
+        }
+        
+        .sidebar-menu {
+            padding: 0;
+            list-style: none;
+        }
+        
+        .sidebar-menu li {
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-menu li a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            display: block;
+        }
+        
+        .sidebar-menu li a:hover, 
+        .sidebar-menu li a.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-menu li a i {
+            margin-right: 10px;
+        }
+        
+        /* Main content area */
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        
+        /* Header styles */
+        .main-header {
+            background-color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logout-btn {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        .logout-btn:hover {
+            color: #c0392b;
+        }
+        
+        /* Page styles */
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Card styles */
+        .profile-card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card-img-top {
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            height: 180px;
+            object-fit: cover;
+        }
+        
+        /* Estilos específicos para Mis Reservas */
+        .reserva-card {
+            border-left: 4px solid var(--secondary-color);
+            transition: all 0.3s;
+        }
+        
+        .reserva-card:hover {
+            transform: translateX(5px);
+        }
+        
+        .badge-estado {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        
+        .estado-confirmada {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .estado-pendiente {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .estado-cancelada {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .estado-completada {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .search-reservas {
+            margin-bottom: 20px;
+        }
+        
+        /* Modal de detalles */
+        .modal-detalles .modal-header {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .modal-detalles .modal-footer {
+            justify-content: space-between;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        /* Estilos para el calendario de disponibilidad */
+        .calendar-container {
+            margin-top: 20px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        
+        .calendar-day-header {
+            text-align: center;
+            font-weight: bold;
+            padding: 5px;
+            background-color: var(--light-color);
+        }
+        
+        .calendar-day {
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 80px;
+            position: relative;
+        }
+        
+        .calendar-day.disabled {
+            background-color: #f8f9fa;
+            color: #adb5bd;
+        }
+        
+        .calendar-day.today {
+            background-color: #e3f2fd;
+        }
+        
+        .calendar-day.selected {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .calendar-day-number {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-weight: bold;
+        }
+        
+        .time-slots {
+            margin-top: 25px;
+        }
+        
+        .time-slot {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .time-slot.available {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .time-slot.booked {
+            background-color: #f8d7da;
+            color: #721c24;
+            cursor: not-allowed;
+        }
+        
+        .time-slot.selected {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+        
+        /* Estilos para el resumen de reserva */
+        .reserva-summary {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .reserva-summary h5 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        /* Estilos para la vista de detalles de reserva */
+        .reserva-detalle {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .reserva-detalle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .reserva-detalle-body {
+            margin-bottom: 20px;
+        }
+        
+        .reserva-detalle-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
