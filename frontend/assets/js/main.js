@@ -14,12 +14,11 @@ export async function protectRoutes() {
     const publicPaths = ['/login.html', '/register.html', '/forgot.html', '/index.html'];
     const currentPath = window.location.pathname;
     
-    // Si es una ruta pública, no hacer validación
+    // Si es una ruta pública
     if (publicPaths.some(path => currentPath.endsWith(path))) {
-        // Si el usuario ya está autenticado, redirigir según su rol
         if (isAuthenticated()) {
             const user = getCurrentUser();
-            window.location.href = user.role === 'admin' ? '/admin.html' : '/profile.html';
+            window.location.href = user.role === 'admin' ? '/admin.html' : '/inicio.html';
         }
         return;
     }
@@ -34,7 +33,9 @@ export async function protectRoutes() {
     // Verificar acceso a rutas de admin
     const adminPaths = ['/admin.html'];
     if (adminPaths.some(path => currentPath.endsWith(path)) && !isAdmin()) {
-        window.location.href = '/403.html';
+        // 🔹 Si no es admin lo mandamos al login
+        logout();
+        window.location.href = '/auth/login.html';
     }
 }
 
@@ -43,7 +44,6 @@ export function updateUserUI() {
     const user = getCurrentUser();
     if (!user) return;
 
-    // Actualizar elementos con clases específicas
     document.querySelectorAll('.user-name').forEach(el => {
         el.textContent = user.name;
     });
@@ -52,12 +52,10 @@ export function updateUserUI() {
         el.textContent = user.email;
     });
 
-    // Mostrar/ocultar elementos según rol
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin() ? 'block' : 'none';
     });
     
-    // Mostrar elementos de autenticación
     document.querySelectorAll('.auth-only').forEach(el => {
         el.style.display = isAuthenticated() ? 'block' : 'none';
     });
@@ -69,13 +67,19 @@ export function updateUserUI() {
 
 // Configurar eventos de autenticación
 export function setupAuthEvents() {
-    // Logout
-    document.querySelectorAll('.logout-btn').forEach(btn => {
+    // Capturar botones logout por clase o ID
+    const logoutButtons = [
+        ...document.querySelectorAll('.logout-btn'),
+        document.getElementById('logoutBtn'),
+        document.getElementById('logoutBtnNav')
+    ].filter(Boolean);
+
+    logoutButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             if (confirm('¿Estás seguro de cerrar sesión?')) {
                 logout();
-                window.location.href = '/login.html';
+                window.location.href = '/auth/login.html';
             }
         });
     });
@@ -91,14 +95,13 @@ export function setupAuthEvents() {
             try {
                 const result = await loginUser(email, password);
                 
-                // Redirigir según rol o parámetro redirect
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirect = urlParams.get('redirect');
                 
                 if (redirect) {
                     window.location.href = redirect;
                 } else {
-                    window.location.href = result.user.role === 'admin' ? '/admin.html' : '/index.html';
+                    window.location.href = result.user.role === 'admin' ? '/admin.html' : '/inicio.html';
                 }
             } catch (error) {
                 const errorElement = loginForm.querySelector('#message') || loginForm;
@@ -117,9 +120,8 @@ export function setupAuthEvents() {
             const password = registerForm.querySelector('#password').value;
             const confirmPassword = registerForm.querySelector('#confirmPassword')?.value;
             
-            // Validar contraseñas
             if (password !== confirmPassword) {
-                showError(registerForm, 'Correo o contraseña incorrecto');
+                showError(registerForm, 'Las contraseñas no coinciden');
                 return;
             }
             
@@ -127,7 +129,7 @@ export function setupAuthEvents() {
                 await registerUser(nombre, email, password);
                 showSuccess(registerForm, '¡Registro exitoso! Redirigiendo...');
                 setTimeout(() => {
-                    window.location.href = '/admin.html';
+                    window.location.href = '/auth/login.html';
                 }, 2000);
             } catch (error) {
                 showError(registerForm, error.message);
@@ -162,5 +164,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateUserUI();
     setupAuthEvents();
 });
-
-
+        

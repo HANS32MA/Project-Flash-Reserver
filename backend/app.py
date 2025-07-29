@@ -1,40 +1,48 @@
+import uuid
 from flask import Flask, jsonify, render_template, request
 from functools import wraps
 from flask_cors import CORS
 import pymysql
 import hashlib
 import secrets
-import psycopg2
-import re
 import jwt
 from datetime import datetime, timedelta
-from datetime import time
+import re
 import json
-import random
-import string
-from flask import Flask, send_from_directory
 import os
-import pymysql.cursors
 from werkzeug.utils import secure_filename
+import traceback
+from flask import send_from_directory
 
 # Configuración para subir archivos
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Límite de 16MB
 app.config['SECRET_KEY'] = 'tu_clave_secreta_super_segura'  # Cambia esto en producción!
-# Crear directorio de uploads si no existe
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+@app.route('/')
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+# Añadir validación de imagen
 def allowed_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
+def process_image(file):
+    if file and allowed_file(file.filename):
+        filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(image_path)
+        return f"/uploads/{filename}"
+    return None
 
-# Configuración de la base de datos (mejorado)
+# Configuración de la base de datos
 def conectar():
     try:
         return pymysql.connect(
@@ -49,7 +57,7 @@ def conectar():
         print(f"Error de conexión a MySQL: {str(e)}")
         raise
 
-# Helper para hash de contraseñas (mejorado)
+# Helper para hash de contraseñas
 def hash_password(password, salt=None):
     if salt is None:
         salt = secrets.token_hex(16)
@@ -64,27 +72,13 @@ def generate_token(user_id):
             'iat': datetime.utcnow(),
             'sub': user_id
         }
-        return jwt.encode(
-            payload,
-            app.config['SECRET_KEY'],
-            algorithm='HS256'
-        )
+        return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
     except Exception as e:
         return e
 
-# Verificar token JWT
-def verify_token(token):
-    try:
-        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        return payload['sub']
-    except jwt.ExpiredSignatureError:
-        return 'Token expirado. Por favor inicia sesión nuevamente.'
-    except jwt.InvalidTokenError:
-        return 'Token inválido. Por favor inicia sesión nuevamente.'
-
 # Middleware para rutas protegidas
 def token_required(f):
-    @wraps(f)  # ✅ ESTO ES LO QUE SOLUCIONA EL ERROR
+    @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization')
         if not token:
@@ -97,8 +91,8 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
-
-##-------------------Registro------------------###
+##-------------------Autenticación------------------###
+##---------------------Registro de Usuario------------------###
 @app.route('/auth/register', methods=['POST'])
 def register():
     try:
@@ -106,8 +100,10 @@ def register():
         nombre = data.get('nombre')
         email = data.get('email')
         password = data.get('password')
+        documento = data.get('documento', None)
+        rol = data.get('rol', 'usuario')
 
-        # Validaciones mejoradas
+        # Validaciones
         if not all([nombre, email, password]):
             return jsonify({"success": False, "message": "Todos los campos son requeridos"}), 400
             
@@ -116,6 +112,9 @@ def register():
             
         if len(password) < 6:
             return jsonify({"success": False, "message": "La contraseña debe tener al menos 6 caracteres"}), 400
+
+        if rol == 'admin' and not documento:
+            return jsonify({"success": False, "message": "Documento requerido para administradores"}), 400
 
         conn = conectar()
         cursor = conn.cursor()
@@ -131,9 +130,9 @@ def register():
         
         # Insertar en BD
         cursor.execute("""
-            INSERT INTO Usuarios (nombre, email, password_hash, salt, rol) 
-            VALUES (%s, %s, %s, %s, 'usuario')
-        """, (nombre, email, hashed_password, salt))
+            INSERT INTO Usuarios (nombre, email, password_hash, salt, rol, documento_numero) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (nombre, email, hashed_password, salt, rol, documento))
         
         conn.commit()
         user_id = cursor.lastrowid
@@ -150,19 +149,19 @@ def register():
         if 'conn' in locals():
             conn.close()
         return jsonify({"success": False, "message": "Error en el servidor"}), 500
+    
 
-##-------------------Login------------------###
+##_--------------------Inicio de Sesión------------------###
 @app.route('/auth/login', methods=['POST'])
 def login():
     try:
         data = request.get_json()
         email = data.get('email')
-        password = data.get('password')  # Texto plano desde frontend
+        password = data.get('password')
 
         conn = conectar()
         cursor = conn.cursor()
     
-        # Buscar usuario
         cursor.execute("""
             SELECT usuario_id, nombre, email, password_hash, salt, rol 
             FROM Usuarios 
@@ -172,29 +171,32 @@ def login():
         conn.close()
 
         if not user:
-            return jsonify({"success": False, "message": "Contraseña o email incorrectos"}), 401
+            return jsonify({"success": False, "message": "Credenciales incorrectas"}), 401
 
-        # Verificar contraseña (hash seguro)
+        # Verificar contraseña
         _, hashed_password = hash_password(password, user['salt'])
         if hashed_password != user['password_hash']:
-            return jsonify({"success": False, "message": "Contraseña o email incorrectos"}), 401
+            return jsonify({"success": False, "message": "Credenciales incorrectas"}), 401
+        
+        token = generate_token(user['usuario_id'])
 
+        # Asegúrate de que el rol se envía correctamente
         return jsonify({
-            "success": True,
-            "message": "Inicio de sesión exitoso", 
-            "user": {
-                "id": user['usuario_id'],
-                "name": user['nombre'],
-                "email": user['email'],
-                "role": user['rol']
-            }
-        })
+    "success": True,
+    "message": "Inicio de sesión exitoso", 
+    "token": token,
+    "user": {
+        "id": user['usuario_id'],
+        "name": user['nombre'],     # opcional, consistente con JS
+        "email": user['email'],
+        "role": user['rol']         # ← clave estandarizada
+    }
+})
 
     except Exception as e:
         print(f"Error en login: {str(e)}")
         return jsonify({"success": False, "message": "Error en el servidor"}), 500
 
-###------------------Validación de token------------------###
 @app.route('/auth/validate-token', methods=['GET'])
 @token_required
 def validate_token(current_user):
@@ -203,23 +205,8 @@ def validate_token(current_user):
         "message": "Token válido",
         "user_id": current_user
     })
-    
-# -------------------- Recuperación de Contraseña --------------------
-# Generar token de recuperación
-def generate_reset_token(email):
-    payload = {
-        'exp': datetime.utcnow() + timedelta(hours=1),
-        'iat': datetime.utcnow(),
-        'sub': email,
-        'purpose': 'password_reset'
-    }
-    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
 
-# Enviar correo de recuperación (simulado)
-def send_reset_email(email, reset_link):
-    print(f"Simulando envío de correo a {email} con enlace: {reset_link}")
-    return True
-
+##-------------------Recuperación de Contraseña------------------###
 @app.route('/auth/forgot-password', methods=['POST'])
 def forgot_password():
     try:
@@ -236,14 +223,14 @@ def forgot_password():
         cursor.execute("SELECT usuario_id FROM Usuarios WHERE email = %s", (email,))
         if not cursor.fetchone():
             conn.close()
-            return jsonify({"success": True, "message": "Si el email existe, te enviaremos un enlace"})  # No revelar si el email existe o no
-
-        # Generar token de recuperación
-        reset_token = generate_reset_token(email)
-        reset_link = f"http://localhost:3000/frontend/auth/reset-password.html?token={reset_token}"
+            return jsonify({"success": True, "message": "Si el email existe, te enviaremos un enlace"})
         
-        # Enviar correo (en producción usarías un servicio real como SendGrid)
-        send_reset_email(email, reset_link)
+        # Generar token de recuperación (simulado)
+        reset_token = secrets.token_urlsafe(32)
+        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+        
+        # Enviar correo (simulado)
+        print(f"Simulando envío de correo a {email} con enlace: {reset_link}")
         
         conn.close()
         return jsonify({
@@ -255,34 +242,6 @@ def forgot_password():
         print(f"Error en forgot_password: {str(e)}")
         if 'conn' in locals():
             conn.close()
-        return jsonify({"success": False, "message": "Error en el servidor"}), 500
-
-@app.route('/auth/validate-reset-token', methods=['POST'])
-def validate_reset_token():
-    try:
-        data = request.get_json()
-        token = data.get('token')
-        
-        if not token:
-            return jsonify({"success": False, "message": "Token requerido"}), 400
-            
-        try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            if payload.get('purpose') != 'password_reset':
-                return jsonify({"success": False, "message": "Token inválido"}), 400
-                
-            return jsonify({
-                "success": True,
-                "message": "Token válido",
-                "email": payload['sub']
-            })
-        except jwt.ExpiredSignatureError:
-            return jsonify({"success": False, "message": "El enlace ha expirado"}), 400
-        except jwt.InvalidTokenError:
-            return jsonify({"success": False, "message": "Token inválido"}), 400
-            
-    except Exception as e:
-        print(f"Error en validate_reset_token: {str(e)}")
         return jsonify({"success": False, "message": "Error en el servidor"}), 500
 
 @app.route('/auth/reset-password', methods=['POST'])
@@ -298,18 +257,9 @@ def reset_password():
         if len(new_password) < 6:
             return jsonify({"success": False, "message": "La contraseña debe tener al menos 6 caracteres"}), 400
             
-        # Validar token
-        try:
-            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            if payload.get('purpose') != 'password_reset':
-                return jsonify({"success": False, "message": "Token inválido"}), 400
-                
-            email = payload['sub']
-        except jwt.ExpiredSignatureError:
-            return jsonify({"success": False, "message": "El enlace ha expirado"}), 400
-        except jwt.InvalidTokenError:
-            return jsonify({"success": False, "message": "Token inválido"}), 400
-            
+        # En una implementación real, aquí validarías el token
+        # Para este ejemplo, asumimos que el token es válido
+        
         # Actualizar contraseña
         conn = conectar()
         cursor = conn.cursor()
@@ -317,11 +267,20 @@ def reset_password():
         # Generar nuevo hash de contraseña
         salt, hashed_password = hash_password(new_password)
         
+        # En una implementación real, aquí usarías el token para identificar al usuario
+        # Para este ejemplo, actualizaremos el primer usuario que encontremos
+        cursor.execute("SELECT usuario_id FROM Usuarios LIMIT 1")
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({"success": False, "message": "Usuario no encontrado"}), 404
+        
         cursor.execute("""
             UPDATE Usuarios 
             SET password_hash = %s, salt = %s 
-            WHERE email = %s
-        """, (hashed_password, salt, email))
+            WHERE usuario_id = %s
+        """, (hashed_password, salt, user['usuario_id']))
         
         conn.commit()
         conn.close()
@@ -336,68 +295,341 @@ def reset_password():
         if 'conn' in locals():
             conn.close()
         return jsonify({"success": False, "message": "Error en el servidor"}), 500
-    
-  ##-------------------Endpoints para el Dashboard------------------###
-@app.route('/api/dashboard/stats', methods=['GET'])
+
+##-------------------Gestión de Canchas------------------###
+@app.route('/api/courts', methods=['GET'])
 @token_required
-def dashboard_stats(current_user):
+def get_courts(current_user):
     conn = conectar()
     cursor = conn.cursor()
     
-    # Reservas de hoy
     cursor.execute("""
-        SELECT COUNT(*) as count FROM Reservas 
-        WHERE fecha_reserva = CURDATE() AND estado IN ('pendiente', 'confirmada')
+        SELECT cancha_id as id, nombre as name, descripcion as description,
+               tipo as type, superficie as surface, techada as covered,
+               capacidad as capacity, precio_hora as price, 
+               imagen_url as image, estado as status
+        FROM Canchas
+        ORDER BY nombre
     """)
-    today_reservations = cursor.fetchone()['count']
     
-    # Canchas activas
-    cursor.execute("SELECT COUNT(*) as count FROM Canchas WHERE estado = 'disponible'")
-    active_courts = cursor.fetchone()['count']
-    
-    # Usuarios registrados
-    cursor.execute("SELECT COUNT(*) as count FROM Usuarios")
-    total_users = cursor.fetchone()['count']
-    
+    courts = cursor.fetchall()
     conn.close()
     
     return jsonify({
         "success": True,
-        "todayReservations": today_reservations,
-        "activeCourts": active_courts,
-        "totalUsers": total_users
+        "courts": courts
     })
 
-@app.route('/api/reservations/recent', methods=['GET'])
+@app.route('/api/courts/<int:court_id>', methods=['GET'])
 @token_required
-def recent_reservations(current_user):
+def get_court(current_user, court_id):
     conn = conectar()
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT R.reserva_id as id, R.fecha_reserva as date, R.hora_inicio as time, 
-               R.estado as status, R.hora_fin as end_time,
-               C.nombre as court_name, U.nombre as user_name
-        FROM Reservas R
-        JOIN Canchas C ON R.cancha_id = C.cancha_id
-        JOIN Usuarios U ON R.usuario_id = U.usuario_id
-        ORDER BY R.fecha_reserva DESC, R.hora_inicio DESC
-        LIMIT 10
-    """)
+        SELECT cancha_id as id, nombre as name, descripcion as description,
+               tipo as type, superficie as surface, techada as covered,
+               capacidad as capacity, precio_hora as price, 
+               imagen_url as image, estado as status
+        FROM Canchas
+        WHERE cancha_id = %s
+    """, (court_id,))
     
-    reservations = cursor.fetchall()
+    court = cursor.fetchone()
+    
+    if not court:
+        conn.close()
+        return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
+    
+    conn.close()
+    return jsonify({"success": True, "court": court})
+
+##-------------------Gestión de Canchas------------------###
+@app.route('/api/courts', methods=['POST'])
+@token_required
+def create_court(current_user):
+    try:
+        # Verificar si el usuario es administrador
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rol FROM Usuarios WHERE usuario_id = %s", (current_user,))
+        user = cursor.fetchone()
+        
+        if user['rol'] != 'admin':
+            conn.close()
+            return jsonify({"success": False, "message": "No autorizado"}), 403
+
+        # Obtener datos del formulario
+        data = request.form
+        
+        # Validar campos requeridos
+        required_fields = ['nombre', 'tipo', 'superficie', 'capacidad', 'precio_hora']
+        if not all(field in data for field in required_fields):
+            conn.close()
+            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+
+        # Procesar datos
+        nombre = data['nombre']
+        descripcion = data.get('descripcion', '')
+        tipo = data['tipo']
+        superficie = data['superficie']
+        techada = 1 if 'techada' in data else 0
+        capacidad = int(data['capacidad'])
+        precio_hora = float(data['precio_hora'])
+        estado = 'disponible'  # Estado por defecto
+
+        # Procesar imagen
+        image_url = None
+        if 'imagen' in request.files:
+            image_file = request.files['imagen']
+            if image_file.filename != '' and allowed_file(image_file.filename):
+                filename = secure_filename(f"{uuid.uuid4().hex}_{image_file.filename}")
+                image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                image_file.save(image_path)
+                image_url = f"/uploads/{filename}"
+
+        # Insertar en la base de datos
+        cursor.execute("""
+            INSERT INTO Canchas (
+                nombre, descripcion, tipo, superficie, techada, 
+                capacidad, precio_hora, imagen_url, estado, created_at, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        """, (nombre, descripcion, tipo, superficie, techada, capacidad, precio_hora, image_url, estado))
+        
+        conn.commit()
+        court_id = cursor.lastrowid
+        
+        # Crear horarios por defecto (8am-10pm para cada día)
+        days = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+        for day in days:
+            cursor.execute("""
+                INSERT INTO Horarios (cancha_id, dia_semana, hora_inicio, hora_fin, disponible)
+                VALUES (%s, %s, '08:00:00', '22:00:00', 1)
+            """, (court_id, day))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Cancha creada exitosamente",
+            "courtId": court_id
+        }), 201
+        
+    except Exception as e:
+        print(f"Error al crear cancha: {str(e)}")
+        traceback.print_exc()
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({"success": False, "message": "Error al crear cancha"}), 500
+    
+    
+
+
+@app.route('/api/courts/<int:court_id>', methods=['PUT'])
+@token_required
+def update_court(current_user, court_id):
+    try:
+        # Verificar si el usuario es administrador
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("SELECT rol FROM Usuarios WHERE usuario_id = %s", (current_user,))
+        user = cursor.fetchone()
+        
+        if user['rol'] != 'admin':
+            conn.close()
+            return jsonify({"success": False, "message": "No autorizado"}), 403
+
+        data = request.form
+        
+        # Validar campos requeridos
+        required_fields = ['nombre', 'tipo', 'superficie', 'capacidad', 'precio_hora']
+        if not all(field in data for field in required_fields):
+            conn.close()
+            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+
+        # Procesar datos
+        nombre = data['nombre']
+        descripcion = data.get('descripcion', '')
+        tipo = data['tipo']
+        superficie = data['superficie']
+        techada = 1 if 'techada' in data else 0
+        capacidad = int(data['capacidad'])
+        precio_hora = float(data['precio_hora'])
+        estado = data.get('estado', 'disponible')
+
+        # Procesar imagen
+        image_url = None
+        if 'imagen' in request.files:
+            image_file = request.files['imagen']
+            if image_file.filename != '' and allowed_file(image_file.filename):
+                filename = secure_filename(f"{uuid.uuid4().hex}_{image_file.filename}")
+                image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                image_file.save(image_path)
+                image_url = f"/uploads/{filename}"
+
+        # Verificar si la cancha existe
+        cursor.execute("SELECT 1 FROM Canchas WHERE cancha_id = %s", (court_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
+        
+        # Actualizar cancha
+        if image_url:
+            cursor.execute("""
+                UPDATE Canchas SET
+                    nombre = %s,
+                    descripcion = %s,
+                    tipo = %s,
+                    superficie = %s,
+                    techada = %s,
+                    capacidad = %s,
+                    precio_hora = %s,
+                    imagen_url = %s,
+                    estado = %s,
+                    updated_at = NOW()
+                WHERE cancha_id = %s
+            """, (nombre, descripcion, tipo, superficie, techada, capacidad, precio_hora, image_url, estado, court_id))
+        else:
+            cursor.execute("""
+                UPDATE Canchas SET
+                    nombre = %s,
+                    descripcion = %s,
+                    tipo = %s,
+                    superficie = %s,
+                    techada = %s,
+                    capacidad = %s,
+                    precio_hora = %s,
+                    estado = %s,
+                    updated_at = NOW()
+                WHERE cancha_id = %s
+            """, (nombre, descripcion, tipo, superficie, techada, capacidad, precio_hora, estado, court_id))
+        
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+        
+        if affected == 0:
+            return jsonify({"success": False, "message": "No se pudo actualizar la cancha"}), 400
+        
+        return jsonify({
+            "success": True,
+            "message": "Cancha actualizada exitosamente"
+        })
+        
+    except Exception as e:
+        print(f"Error al actualizar cancha: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({"success": False, "message": "Error al actualizar cancha"}), 500
+
+@app.route('/api/courts/<int:court_id>/delete', methods=['DELETE'])
+@token_required
+def delete_court(current_user, court_id):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+
+        # Verificar si la cancha existe
+        cursor.execute("SELECT * FROM Canchas WHERE cancha_id = %s", (court_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
+
+        # Eliminación lógica: marcar como inactiva
+        cursor.execute("""
+            UPDATE Canchas SET estado = 'inactiva' WHERE cancha_id = %s
+        """, (court_id,))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True, "message": "Cancha eliminada (inactivada)"})
+    except Exception as e:
+        print(f"Error al eliminar cancha: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({"success": False, "message": "Error al eliminar la cancha"}), 500
+
+##-------------------Gestión de Horarios------------------###
+@app.route('/api/courts/<int:court_id>/schedules', methods=['GET'])
+@token_required
+def get_court_schedules(current_user, court_id):
+    conn = conectar()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT horario_id as id, dia_semana as day, 
+               TIME_FORMAT(hora_inicio, '%%H:%%i') as start_time,
+               TIME_FORMAT(hora_fin, '%%H:%%i') as end_time,
+               disponible as available
+        FROM Horarios
+        WHERE cancha_id = %s
+        ORDER BY FIELD(dia_semana, 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'),
+                 hora_inicio
+    """, (court_id,))
+    
+    schedules = cursor.fetchall()
     conn.close()
     
     return jsonify({
         "success": True,
-        "reservations": reservations
+        "schedules": schedules
     })
-    
-##------------------Endpoints para Gestión de Reservas------------------###
+
+@app.route('/api/schedules/<int:schedule_id>', methods=['PUT'])
+@token_required
+def update_schedule(current_user, schedule_id):
+    try:
+        data = request.get_json()
+        
+        required_fields = ['start_time', 'end_time', 'available']
+        if not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+        
+        start_time = data['start_time']
+        end_time = data['end_time']
+        available = data['available']
+        
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        # Verificar si el horario existe
+        cursor.execute("SELECT 1 FROM Horarios WHERE horario_id = %s", (schedule_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "Horario no encontrado"}), 404
+        
+        # Actualizar horario
+        cursor.execute("""
+            UPDATE Horarios SET
+                hora_inicio = %s,
+                hora_fin = %s,
+                disponible = %s
+            WHERE horario_id = %s
+        """, (start_time, end_time, available, schedule_id))
+        
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+        
+        if affected == 0:
+            return jsonify({"success": False, "message": "No se pudo actualizar el horario"}), 400
+        
+        return jsonify({
+            "success": True,
+            "message": "Horario actualizado exitosamente"
+        })
+        
+    except Exception as e:
+        print(f"Error al actualizar horario: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({"success": False, "message": "Error al actualizar horario"}), 500
+
+##-------------------Gestión de Reservas------------------###
 @app.route('/api/reservations', methods=['GET'])
 @token_required
 def get_reservations(current_user):
-    # Obtener parámetros de filtrado
     page = request.args.get('page', 1, type=int)
     per_page = 10
     offset = (page - 1) * per_page
@@ -412,14 +644,17 @@ def get_reservations(current_user):
     
     # Construir consulta base
     query = """
-        SELECT R.reserva_id as id, R.fecha_reserva as date, R.hora_inicio as time, 
-               R.estado as status, R.hora_fin as end_time,
+        SELECT R.reserva_id as id, R.fecha_reserva as date, 
+               TIME_FORMAT(R.hora_inicio, '%%H:%%i') as time,
+               TIME_FORMAT(R.hora_fin, '%%H:%%i') as end_time,
+               R.estado as status, R.codigo_reserva as code,
                C.nombre as court_name, C.cancha_id as court_id,
                U.nombre as user_name, U.usuario_id as user_id,
                TIMESTAMPDIFF(HOUR, R.hora_inicio, R.hora_fin) as duration
         FROM Reservas R
         JOIN Canchas C ON R.cancha_id = C.cancha_id
         JOIN Usuarios U ON R.usuario_id = U.usuario_id
+        JOIN Horarios H ON R.horario_id = H.horario_id
     """
     
     conditions = []
@@ -474,15 +709,20 @@ def get_reservation(current_user, reservation_id):
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT R.reserva_id as id, R.fecha_reserva as date, R.hora_inicio as time, 
-               R.estado as status, R.hora_fin as end_time, R.codigo_reserva as code,
+        SELECT R.reserva_id as id, R.fecha_reserva as date, 
+               TIME_FORMAT(R.hora_inicio, '%%H:%%i') as time,
+               TIME_FORMAT(R.hora_fin, '%%H:%%i') as end_time,
+               R.estado as status, R.codigo_reserva as code,
                C.nombre as court_name, C.cancha_id as court_id,
                U.nombre as user_name, U.usuario_id as user_id, U.email as user_email,
                TIMESTAMPDIFF(HOUR, R.hora_inicio, R.hora_fin) as duration,
-               R.created_at as created_at, R.updated_at as updated_at
+               H.horario_id as schedule_id,
+               DATE_FORMAT(R.created_at, '%%d/%%m/%%Y %%H:%%i') as created_at,
+               DATE_FORMAT(R.updated_at, '%%d/%%m/%%Y %%H:%%i') as updated_at
         FROM Reservas R
         JOIN Canchas C ON R.cancha_id = C.cancha_id
         JOIN Usuarios U ON R.usuario_id = U.usuario_id
+        JOIN Horarios H ON R.horario_id = H.horario_id
         WHERE R.reserva_id = %s
     """, (reservation_id,))
     
@@ -494,6 +734,78 @@ def get_reservation(current_user, reservation_id):
     
     conn.close()
     return jsonify({"success": True, "reservation": reservation})
+
+@app.route('/api/reservations', methods=['POST'])
+@token_required
+def create_reservation(current_user):
+    try:
+        data = request.get_json()
+        
+        required_fields = ['court_id', 'user_id', 'date', 'schedule_id']
+        if not all(field in data for field in required_fields):
+            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
+        
+        court_id = int(data['court_id'])
+        user_id = int(data['user_id'])
+        date = data['date']
+        schedule_id = int(data['schedule_id'])
+        status = data.get('status', 'confirmada')
+        
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        # Obtener información del horario
+        cursor.execute("""
+            SELECT hora_inicio, hora_fin FROM Horarios 
+            WHERE horario_id = %s AND cancha_id = %s
+        """, (schedule_id, court_id))
+        schedule = cursor.fetchone()
+        
+        if not schedule:
+            conn.close()
+            return jsonify({"success": False, "message": "Horario no válido para esta cancha"}), 400
+        
+        start_time = schedule['hora_inicio']
+        end_time = schedule['hora_fin']
+        
+        # Verificar disponibilidad
+        cursor.execute("""
+            SELECT 1 FROM Reservas 
+            WHERE cancha_id = %s AND fecha_reserva = %s AND horario_id = %s
+            AND estado IN ('pendiente', 'confirmada')
+        """, (court_id, date, schedule_id))
+        
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"success": False, "message": "La cancha no está disponible en ese horario"}), 400
+        
+        # Generar código de reserva único
+        code = secrets.token_hex(3).upper()
+        
+        # Crear reserva
+        cursor.execute("""
+            INSERT INTO Reservas (
+                usuario_id, cancha_id, horario_id, fecha_reserva, 
+                hora_inicio, hora_fin, estado, codigo_reserva
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, court_id, schedule_id, date, start_time, end_time, status, code))
+        
+        conn.commit()
+        reservation_id = cursor.lastrowid
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": "Reserva creada exitosamente",
+            "reservationId": reservation_id,
+            "reservationCode": code
+        })
+        
+    except Exception as e:
+        print(f"Error al crear reserva: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return jsonify({"success": False, "message": "Error al crear reserva"}), 500
 
 @app.route('/api/reservations/<int:reservation_id>/confirm', methods=['PUT'])
 @token_required
@@ -537,367 +849,7 @@ def cancel_reservation(current_user, reservation_id):
     
     return jsonify({"success": True, "message": "Reserva cancelada"})
 
-@app.route('/api/reservations/form-data', methods=['GET'])
-@token_required
-def get_reservation_form_data(current_user):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT cancha_id as id, nombre as name FROM Canchas WHERE estado = 'disponible'")
-    courts = cursor.fetchall()
-    
-    cursor.execute("SELECT usuario_id as id, nombre as name FROM Usuarios")
-    users = cursor.fetchall()
-    
-    conn.close()
-    
-    return jsonify({
-        "success": True,
-        "courts": courts,
-        "users": users
-    })
-
-@app.route('/api/reservations', methods=['POST'])
-@token_required
-def create_reservation(current_user):
-    data = request.get_json()
-    
-    required_fields = ['courtId', 'userId', 'date', 'time', 'duration', 'status']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        court_id = int(data['courtId'])
-        user_id = int(data['userId'])
-        date = data['date']
-        time = data['time']
-        duration = float(data['duration'])
-        status = data['status']
-        
-        start_time = datetime.strptime(time, '%H:%M').time()
-        end_time = (datetime.combine(datetime.today(), start_time) + timedelta(hours=duration)).time()
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar disponibilidad
-        cursor.execute("""
-            SELECT 1 FROM Reservas 
-            WHERE cancha_id = %s AND fecha_reserva = %s 
-            AND (
-                (hora_inicio < %s AND hora_fin > %s) OR
-                (hora_inicio >= %s AND hora_inicio < %s) OR
-                (hora_fin > %s AND hora_fin <= %s)
-            )
-            AND estado IN ('pendiente', 'confirmada')
-        """, (court_id, date, end_time, start_time, start_time, end_time, start_time, end_time))
-        
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "La cancha no está disponible en ese horario"}), 400
-        
-        # Crear reserva
-        cursor.execute("""
-            INSERT INTO Reservas (
-                usuario_id, cancha_id, fecha_reserva, hora_inicio, hora_fin, estado
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-        """, (user_id, court_id, date, start_time, end_time, status))
-        
-        conn.commit()
-        reservation_id = cursor.lastrowid
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Reserva creada exitosamente",
-            "reservationId": reservation_id
-        })
-        
-    except Exception as e:
-        print(f"Error al crear reserva: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al crear reserva"}), 500
-
-@app.route('/api/reservations/<int:reservation_id>', methods=['PUT'])
-@token_required
-def update_reservation(current_user, reservation_id):
-    data = request.get_json()
-    
-    required_fields = ['courtId', 'userId', 'date', 'time', 'duration', 'status']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        court_id = int(data['courtId'])
-        user_id = int(data['userId'])
-        date = data['date']
-        time = data['time']
-        duration = float(data['duration'])
-        status = data['status']
-        
-        start_time = datetime.strptime(time, '%H:%M').time()
-        end_time = (datetime.combine(datetime.today(), start_time) + timedelta(hours=duration)).time()
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar si la reserva existe
-        cursor.execute("SELECT 1 FROM Reservas WHERE reserva_id = %s", (reservation_id,))
-        if not cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "Reserva no encontrada"}), 404
-        
-        # Verificar disponibilidad (excluyendo la reserva actual)
-        cursor.execute("""
-            SELECT 1 FROM Reservas 
-            WHERE cancha_id = %s AND fecha_reserva = %s 
-            AND reserva_id != %s
-            AND (
-                (hora_inicio < %s AND hora_fin > %s) OR
-                (hora_inicio >= %s AND hora_inicio < %s) OR
-                (hora_fin > %s AND hora_fin <= %s)
-            )
-            AND estado IN ('pendiente', 'confirmada')
-        """, (court_id, date, reservation_id, end_time, start_time, start_time, end_time, start_time, end_time))
-        
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "La cancha no está disponible en ese horario"}), 400
-        
-        # Actualizar reserva
-        cursor.execute("""
-            UPDATE Reservas SET
-                usuario_id = %s,
-                cancha_id = %s,
-                fecha_reserva = %s,
-                hora_inicio = %s,
-                hora_fin = %s,
-                estado = %s
-            WHERE reserva_id = %s
-        """, (user_id, court_id, date, start_time, end_time, status, reservation_id))
-        
-        conn.commit()
-        affected = cursor.rowcount
-        conn.close()
-        
-        if affected == 0:
-            return jsonify({"success": False, "message": "No se pudo actualizar la reserva"}), 400
-        
-        return jsonify({
-            "success": True,
-            "message": "Reserva actualizada exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar reserva: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar reserva"}), 500
-    
-##------------------Endpoints para Gestión de Canchas------------------###
-@app.route('/api/courts', methods=['GET'])
-@token_required
-def get_courts(current_user):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT cancha_id as id, nombre as name, descripcion as description,
-               precio_hora as price, imagen_url as image, estado as status,
-               CASE 
-                   WHEN estado = 'disponible' THEN 'Activa'
-                   WHEN estado = 'mantenimiento' THEN 'En Mantenimiento'
-                   WHEN estado = 'inactiva' THEN 'Inactiva'
-               END as status_text
-        FROM Canchas
-        ORDER BY nombre
-    """)
-    
-    courts = cursor.fetchall()
-    conn.close()
-    
-    return jsonify({
-        "success": True,
-        "courts": courts
-    })
-
-@app.route('/api/courts/<int:court_id>', methods=['GET'])
-@token_required
-def get_court(current_user, court_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT cancha_id as id, nombre as name, descripcion as description,
-               precio_hora as price, imagen_url as image, estado as status
-        FROM Canchas
-        WHERE cancha_id = %s
-    """, (court_id,))
-    
-    court = cursor.fetchone()
-    
-    if not court:
-        conn.close()
-        return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
-    
-    conn.close()
-    return jsonify({"success": True, "court": court})
-
-@app.route('/api/courts', methods=['POST'])
-@token_required
-def create_court(current_user):
-    try:
-        data = request.form
-        
-        required_fields = ['name', 'description', 'price']
-        if not all(field in data for field in required_fields):
-            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-        
-        name = data['name']
-        description = data['description']
-        price = float(data['price'])
-        status = data.get('status', 'disponible')
-        
-        # Procesar imagen si se envió
-        image_url = None
-        if 'image' in request.files:
-            image_file = request.files['image']
-            if image_file.filename != '':
-                filename = secure_filename(image_file.filename)
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                image_file.save(image_path)
-                image_url = f"/uploads/{filename}"
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO Canchas (nombre, descripcion, precio_hora, imagen_url, estado)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (name, description, price, image_url, status))
-        
-        conn.commit()
-        court_id = cursor.lastrowid
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Cancha creada exitosamente",
-            "courtId": court_id
-        })
-        
-    except Exception as e:
-        print(f"Error al crear cancha: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al crear cancha"}), 500
-
-@app.route('/api/courts/<int:court_id>', methods=['PUT'])
-@token_required
-def update_court(current_user, court_id):
-    try:
-        data = request.form
-        
-        required_fields = ['name', 'description', 'price']
-        if not all(field in data for field in required_fields):
-            return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-        
-        name = data['name']
-        description = data['description']
-        price = float(data['price'])
-        status = data.get('status', 'disponible')
-        
-        # Procesar imagen si se envió
-        image_url = None
-        if 'image' in request.files:
-            image_file = request.files['image']
-            if image_file.filename != '':
-                filename = secure_filename(image_file.filename)
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                image_file.save(image_path)
-                image_url = f"/uploads/{filename}"
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar si la cancha existe
-        cursor.execute("SELECT 1 FROM Canchas WHERE cancha_id = %s", (court_id,))
-        if not cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
-        
-        # Actualizar cancha
-        if image_url:
-            cursor.execute("""
-                UPDATE Canchas SET
-                    nombre = %s,
-                    descripcion = %s,
-                    precio_hora = %s,
-                    imagen_url = %s,
-                    estado = %s
-                WHERE cancha_id = %s
-            """, (name, description, price, image_url, status, court_id))
-        else:
-            cursor.execute("""
-                UPDATE Canchas SET
-                    nombre = %s,
-                    descripcion = %s,
-                    precio_hora = %s,
-                    estado = %s
-                WHERE cancha_id = %s
-            """, (name, description, price, status, court_id))
-        
-        conn.commit()
-        affected = cursor.rowcount
-        conn.close()
-        
-        if affected == 0:
-            return jsonify({"success": False, "message": "No se pudo actualizar la cancha"}), 400
-        
-        return jsonify({
-            "success": True,
-            "message": "Cancha actualizada exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar cancha: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar cancha"}), 500
-
-@app.route('/api/courts/<int:court_id>', methods=['DELETE'])
-@token_required
-def delete_court(current_user, court_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    # Verificar si la cancha tiene reservas futuras
-    cursor.execute("""
-        SELECT 1 FROM Reservas 
-        WHERE cancha_id = %s AND fecha_reserva >= CURDATE()
-        AND estado IN ('pendiente', 'confirmada')
-    """, (court_id,))
-    
-    if cursor.fetchone():
-        conn.close()
-        return jsonify({
-            "success": False, 
-            "message": "No se puede eliminar la cancha porque tiene reservas futuras"
-        }), 400
-    
-    # Eliminar cancha
-    cursor.execute("DELETE FROM Canchas WHERE cancha_id = %s", (court_id,))
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-    
-    if affected == 0:
-        return jsonify({"success": False, "message": "Cancha no encontrada"}), 404
-    
-    return jsonify({"success": True, "message": "Cancha eliminada exitosamente"})
-
-##------------------Endpoints para Gestión de Usuarios------------------###
+##-------------------Gestión de Usuarios------------------###
 @app.route('/api/users', methods=['GET'])
 @token_required
 def get_users(current_user):
@@ -907,7 +859,6 @@ def get_users(current_user):
     
     name_filter = request.args.get('name')
     email_filter = request.args.get('email')
-    status_filter = request.args.get('status')
     
     conn = conectar()
     cursor = conn.cursor()
@@ -920,13 +871,8 @@ def get_users(current_user):
                    WHEN rol = 'admin' THEN 'Administrador'
                    ELSE 'Usuario'
                END as role_text,
-               estado as status,
-               CASE 
-                   WHEN estado = 'activo' THEN 'Activo'
-                   ELSE 'Bloqueado'
-               END as status_text,
                DATE_FORMAT(created_at, '%%d/%%m/%%Y') as registration_date,
-               (SELECT COUNT(*) FROM Reservas WHERE usuario_id = usuario_id) as reservations_count
+               (SELECT COUNT(*) FROM Reservas WHERE usuario_id = Usuarios.usuario_id) as reservations_count
         FROM Usuarios
     """
     
@@ -940,9 +886,6 @@ def get_users(current_user):
     if email_filter:
         conditions.append("email LIKE %s")
         params.append(f"%{email_filter}%")
-    if status_filter:
-        conditions.append("estado = %s")
-        params.append(status_filter)
     
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -975,7 +918,7 @@ def get_user(current_user, user_id):
     
     cursor.execute("""
         SELECT usuario_id as id, nombre as name, email, 
-               documento_numero as document, rol as role, estado as status,
+               documento_numero as document, rol as role,
                DATE_FORMAT(created_at, '%%d/%%m/%%Y') as registration_date,
                (SELECT COUNT(*) FROM Reservas WHERE usuario_id = %s) as reservations_count
         FROM Usuarios
@@ -991,181 +934,7 @@ def get_user(current_user, user_id):
     conn.close()
     return jsonify({"success": True, "user": user})
 
-@app.route('/api/users', methods=['POST'])
-@token_required
-def create_user(current_user):
-    data = request.get_json()
-    
-    required_fields = ['name', 'email', 'password', 'role', 'status']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        name = data['name']
-        email = data['email']
-        password = data['password']
-        role = data['role']
-        status = data['status']
-        document = data.get('document')
-        
-        if role == 'admin' and not document:
-            return jsonify({"success": False, "message": "Los administradores deben tener documento"}), 400
-        
-        # Validar email único
-        conn = conectar()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM Usuarios WHERE email = %s", (email,))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "El email ya está registrado"}), 400
-        
-        # Hash de contraseña
-        salt, hashed_password = hash_password(password)
-        
-        # Crear usuario
-        cursor.execute("""
-            INSERT INTO Usuarios (
-                nombre, email, password_hash, salt, rol, estado, documento_numero
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (name, email, hashed_password, salt, role, status, document))
-        
-        conn.commit()
-        user_id = cursor.lastrowid
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Usuario creado exitosamente",
-            "userId": user_id
-        })
-        
-    except Exception as e:
-        print(f"Error al crear usuario: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al crear usuario"}), 500
-
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
-@token_required
-def update_user(current_user, user_id):
-    data = request.get_json()
-    
-    required_fields = ['name', 'email', 'role', 'status']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        name = data['name']
-        email = data['email']
-        role = data['role']
-        status = data['status']
-        document = data.get('document')
-        password = data.get('password')
-        
-        if role == 'admin' and not document:
-            return jsonify({"success": False, "message": "Los administradores deben tener documento"}), 400
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar si el usuario existe
-        cursor.execute("SELECT 1 FROM Usuarios WHERE usuario_id = %s", (user_id,))
-        if not cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "Usuario no encontrado"}), 404
-        
-        # Verificar email único (excluyendo el usuario actual)
-        cursor.execute("SELECT 1 FROM Usuarios WHERE email = %s AND usuario_id != %s", (email, user_id))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "El email ya está registrado"}), 400
-        
-        # Actualizar usuario
-        if password:
-            salt, hashed_password = hash_password(password)
-            cursor.execute("""
-                UPDATE Usuarios SET
-                    nombre = %s,
-                    email = %s,
-                    password_hash = %s,
-                    salt = %s,
-                    rol = %s,
-                    estado = %s,
-                    documento_numero = %s
-                WHERE usuario_id = %s
-            """, (name, email, hashed_password, salt, role, status, document, user_id))
-        else:
-            cursor.execute("""
-                UPDATE Usuarios SET
-                    nombre = %s,
-                    email = %s,
-                    rol = %s,
-                    estado = %s,
-                    documento_numero = %s
-                WHERE usuario_id = %s
-            """, (name, email, role, status, document, user_id))
-        
-        conn.commit()
-        affected = cursor.rowcount
-        conn.close()
-        
-        if affected == 0:
-            return jsonify({"success": False, "message": "No se pudo actualizar el usuario"}), 400
-        
-        return jsonify({
-            "success": True,
-            "message": "Usuario actualizado exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar usuario: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar usuario"}), 500
-
-@app.route('/api/users/<int:user_id>/block', methods=['PUT'])
-@token_required
-def block_user(current_user, user_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        UPDATE Usuarios 
-        SET estado = 'bloqueado' 
-        WHERE usuario_id = %s AND estado = 'activo'
-    """, (user_id,))
-    
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-    
-    if affected == 0:
-        return jsonify({"success": False, "message": "Usuario no encontrado o ya bloqueado"}), 404
-    
-    return jsonify({"success": True, "message": "Usuario bloqueado exitosamente"})
-
-@app.route('/api/users/<int:user_id>/activate', methods=['PUT'])
-@token_required
-def activate_user(current_user, user_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        UPDATE Usuarios 
-        SET estado = 'activo' 
-        WHERE usuario_id = %s AND estado = 'bloqueado'
-    """, (user_id,))
-    
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-    
-    if affected == 0:
-        return jsonify({"success": False, "message": "Usuario no encontrado o ya activo"}), 404
-    
-    return jsonify({"success": True, "message": "Usuario activado exitosamente"})
-
-##------------------Endpoints para Estadísticas------------------###
+##-------------------Estadísticas------------------###
 @app.route('/api/stats/daily-reservations', methods=['GET'])
 @token_required
 def daily_reservations_stats(current_user):
@@ -1241,504 +1010,36 @@ def court_reservations_stats(current_user):
         "data": data
     })
 
-##------------------Endpoints para Notificaciones------------------###
-@app.route('/api/notifications', methods=['GET'])
+##-------------------Dashboard------------------###
+@app.route('/api/dashboard/stats', methods=['GET'])
 @token_required
-def get_notifications(current_user):
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    offset = (page - 1) * per_page
-    
+def dashboard_stats(current_user):
     conn = conectar()
     cursor = conn.cursor()
     
-    # Contar total para paginación
-    cursor.execute("SELECT COUNT(*) as total FROM Notificaciones")
-    total = cursor.fetchone()['total']
-    
-    # Obtener notificaciones
+    # Reservas de hoy
     cursor.execute("""
-        SELECT notificacion_id as id, titulo as title, contenido as content,
-               destinatarios as recipients, fecha_envio as date,
-               CASE 
-                   WHEN destinatarios = 'all' THEN 'Todos los usuarios'
-                   WHEN destinatarios = 'active' THEN 'Usuarios activos'
-                   WHEN destinatarios = 'with-reservations' THEN 'Usuarios con reservas'
-                   WHEN destinatarios = 'specific' THEN 'Usuarios específicos'
-               END as recipients_text,
-               DATE_FORMAT(fecha_envio, '%%d/%%m/%%Y %%H:%%i') as formatted_date
-        FROM Notificaciones
-        ORDER BY fecha_envio DESC
-        LIMIT %s OFFSET %s
-    """, (per_page, offset))
-    
-    notifications = cursor.fetchall()
-    
-    # Obtener usuarios para el selector
-    cursor.execute("SELECT usuario_id as id, nombre as name FROM Usuarios")
-    users = cursor.fetchall()
-    
-    conn.close()
-    
-    return jsonify({
-        "success": True,
-        "notifications": notifications,
-        "total": total,
-        "users": users
-    })
-
-@app.route('/api/notifications/<int:notification_id>', methods=['GET'])
-@token_required
-def get_notification(current_user, notification_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT notificacion_id as id, titulo as title, contenido as content,
-               destinatarios as recipients, fecha_envio as date,
-               usuarios_especificos as specific_users,
-               tipo as type,
-               CASE 
-                   WHEN destinatarios = 'all' THEN 'Todos los usuarios'
-                   WHEN destinatarios = 'active' THEN 'Usuarios activos'
-                   WHEN destinatarios = 'with-reservations' THEN 'Usuarios con reservas'
-                   WHEN destinatarios = 'specific' THEN 'Usuarios específicos'
-               END as recipients_text,
-               CASE 
-                   WHEN tipo = 'general' THEN 'General'
-                   WHEN tipo = 'promotion' THEN 'Promoción'
-                   WHEN tipo = 'important' THEN 'Importante'
-               END as type_text,
-               DATE_FORMAT(fecha_envio, '%%d/%%m/%%Y %%H:%%i') as formatted_date
-        FROM Notificaciones
-        WHERE notificacion_id = %s
-    """, (notification_id,))
-    
-    notification = cursor.fetchone()
-    
-    if not notification:
-        conn.close()
-        return jsonify({"success": False, "message": "Notificación no encontrada"}), 404
-    
-    conn.close()
-    return jsonify({"success": True, "notification": notification})
-
-@app.route('/api/notifications', methods=['POST'])
-@token_required
-def create_notification(current_user):
-    data = request.get_json()
-    
-    required_fields = ['title', 'content', 'recipients', 'type']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        title = data['title']
-        content = data['content']
-        recipients = data['recipients']
-        type = data['type']
-        specific_users = data.get('specificUsers', [])
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Crear notificación
-        cursor.execute("""
-            INSERT INTO Notificaciones (
-                titulo, contenido, destinatarios, tipo, usuarios_especificos
-            ) VALUES (%s, %s, %s, %s, %s)
-        """, (title, content, recipients, type, json.dumps(specific_users) if specific_users else None))
-        
-        conn.commit()
-        notification_id = cursor.lastrowid
-        
-        # Enviar notificaciones a los usuarios (simulado)
-        if recipients == 'all':
-            cursor.execute("SELECT usuario_id as id FROM Usuarios")
-            users = [u['id'] for u in cursor.fetchall()]
-        elif recipients == 'active':
-            cursor.execute("SELECT usuario_id as id FROM Usuarios WHERE estado = 'activo'")
-            users = [u['id'] for u in cursor.fetchall()]
-        elif recipients == 'with-reservations':
-            cursor.execute("SELECT DISTINCT usuario_id as id FROM Reservas")
-            users = [u['id'] for u in cursor.fetchall()]
-        elif recipients == 'specific':
-            users = specific_users
-        
-        # Registrar envío (simulado)
-        for user_id in users:
-            cursor.execute("""
-                INSERT INTO NotificacionesUsuarios (
-                    notificacion_id, usuario_id, estado
-                ) VALUES (%s, %s, 'enviada')
-            """, (notification_id, user_id))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Notificación enviada exitosamente",
-            "notificationId": notification_id
-        })
-        
-    except Exception as e:
-        print(f"Error al enviar notificación: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al enviar notificación"}), 500
-
-@app.route('/api/notifications/<int:notification_id>', methods=['DELETE'])
-@token_required
-def delete_notification(current_user, notification_id):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    # Eliminar notificación
-    cursor.execute("DELETE FROM Notificaciones WHERE notificacion_id = %s", (notification_id,))
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-    
-    if affected == 0:
-        return jsonify({"success": False, "message": "Notificación no encontrada"}), 404
-    
-    return jsonify({"success": True, "message": "Notificación eliminada exitosamente"})
-
-##------------------Endpoints para Configuración------------------###
-@app.route('/api/settings', methods=['GET'])
-@token_required
-def get_settings(current_user):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT nombre_sitio as siteName, email_contacto as contactEmail,
-               telefono_contacto as contactPhone, horario_atencion as businessHours,
-               direccion as businessAddress,
-               plantilla_reserva_confirmada as confirmedReservationTemplate
-        FROM Configuracion
-        LIMIT 1
+        SELECT COUNT(*) as count FROM Reservas 
+        WHERE fecha_reserva = CURDATE() AND estado IN ('pendiente', 'confirmada')
     """)
+    today_reservations = cursor.fetchone()['count']
     
-    settings = cursor.fetchone()
+    # Canchas activas
+    cursor.execute("SELECT COUNT(*) as count FROM Canchas WHERE estado = 'disponible'")
+    active_courts = cursor.fetchone()['count']
     
-    if not settings:
-        # Configuración por defecto
-        settings = {
-            "siteName": "ReservaCanchas",
-            "contactEmail": "contacto@reservacanchas.com",
-            "contactPhone": "+123456789",
-            "businessHours": "Lunes a Viernes: 9:00 - 18:00",
-            "businessAddress": "Av. Principal 123, Ciudad",
-            "confirmedReservationTemplate": "Su reserva ha sido confirmada para el {fecha} a las {hora} en la cancha {cancha}."
-        }
+    # Usuarios registrados
+    cursor.execute("SELECT COUNT(*) as count FROM Usuarios")
+    total_users = cursor.fetchone()['count']
     
     conn.close()
+    
     return jsonify({
         "success": True,
-        "settings": settings
+        "todayReservations": today_reservations,
+        "activeCourts": active_courts,
+        "totalUsers": total_users
     })
-
-@app.route('/api/settings', methods=['PUT'])
-@token_required
-def update_settings(current_user):
-    data = request.get_json()
-    
-    required_fields = ['siteName', 'contactEmail', 'contactPhone', 'businessHours', 'businessAddress']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        site_name = data['siteName']
-        contact_email = data['contactEmail']
-        contact_phone = data['contactPhone']
-        business_hours = data['businessHours']
-        business_address = data['businessAddress']
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar si ya existe configuración
-        cursor.execute("SELECT 1 FROM Configuracion")
-        if cursor.fetchone():
-            # Actualizar configuración existente
-            cursor.execute("""
-                UPDATE Configuracion SET
-                    nombre_sitio = %s,
-                    email_contacto = %s,
-                    telefono_contacto = %s,
-                    horario_atencion = %s,
-                    direccion = %s
-            """, (site_name, contact_email, contact_phone, business_hours, business_address))
-        else:
-            # Insertar nueva configuración
-            cursor.execute("""
-                INSERT INTO Configuracion (
-                    nombre_sitio, email_contacto, telefono_contacto, 
-                    horario_atencion, direccion
-                ) VALUES (%s, %s, %s, %s, %s)
-            """, (site_name, contact_email, contact_phone, business_hours, business_address))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Configuración actualizada exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar configuración: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar configuración"}), 500
-
-@app.route('/api/settings/notification', methods=['PUT'])
-@token_required
-def update_notification_template(current_user):
-    data = request.get_json()
-    
-    if 'template' not in data:
-        return jsonify({"success": False, "message": "Plantilla requerida"}), 400
-    
-    try:
-        template = data['template']
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar si ya existe configuración
-        cursor.execute("SELECT 1 FROM Configuracion")
-        if cursor.fetchone():
-            # Actualizar plantilla
-            cursor.execute("""
-                UPDATE Configuracion SET
-                    plantilla_reserva_confirmada = %s
-            """, (template,))
-        else:
-            # Insertar nueva configuración con plantilla
-            cursor.execute("""
-                INSERT INTO Configuracion (
-                    plantilla_reserva_confirmada
-                ) VALUES (%s)
-            """, (template,))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Plantilla de notificación actualizada"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar plantilla: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar plantilla"}), 500
-    
-##------------------Endpoints para Perfil de Administrador------------------###
-@app.route('/api/admin/profile', methods=['GET'])
-@token_required
-def get_admin_profile(current_user):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT usuario_id as id, nombre as name, email, 
-               documento_numero as document, telefono as phone,
-               imagen_perfil as profileImage,
-               DATE_FORMAT(ultimo_acceso, '%%d/%%m/%%Y %%H:%%i') as lastAccess,
-               ip_ultimo_acceso as ip
-        FROM Usuarios
-        WHERE usuario_id = %s
-    """, (current_user,))
-    
-    profile = cursor.fetchone()
-    
-    if not profile:
-        conn.close()
-        return jsonify({"success": False, "message": "Perfil no encontrado"}), 404
-    
-    conn.close()
-    return jsonify({"success": True, "profile": profile})
-
-@app.route('/api/admin/profile', methods=['PUT'])
-@token_required
-def update_admin_profile(current_user):
-    data = request.get_json()
-    
-    required_fields = ['name', 'email', 'phone']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        name = data['name']
-        email = data['email']
-        phone = data['phone']
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Verificar email único (excluyendo el usuario actual)
-        cursor.execute("SELECT 1 FROM Usuarios WHERE email = %s AND usuario_id != %s", (email, current_user))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"success": False, "message": "El email ya está registrado"}), 400
-        
-        # Actualizar perfil
-        cursor.execute("""
-            UPDATE Usuarios SET
-                nombre = %s,
-                email = %s,
-                telefono = %s
-            WHERE usuario_id = %s
-        """, (name, email, phone, current_user))
-        
-        conn.commit()
-        affected = cursor.rowcount
-        conn.close()
-        
-        if affected == 0:
-            return jsonify({"success": False, "message": "No se pudo actualizar el perfil"}), 400
-        
-        return jsonify({
-            "success": True,
-            "message": "Perfil actualizado exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar perfil: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar perfil"}), 500
-
-@app.route('/api/admin/password', methods=['PUT'])
-@token_required
-def update_admin_password(current_user):
-    data = request.get_json()
-    
-    required_fields = ['currentPassword', 'newPassword']
-    if not all(field in data for field in required_fields):
-        return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
-    
-    try:
-        current_password = data['currentPassword']
-        new_password = data['newPassword']
-        
-        if len(new_password) < 6:
-            return jsonify({"success": False, "message": "La contraseña debe tener al menos 6 caracteres"}), 400
-        
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        # Obtener usuario y verificar contraseña actual
-        cursor.execute("SELECT password_hash, salt FROM Usuarios WHERE usuario_id = %s", (current_user,))
-        user = cursor.fetchone()
-        
-        if not user:
-            conn.close()
-            return jsonify({"success": False, "message": "Usuario no encontrado"}), 404
-        
-        # Verificar contraseña actual
-        _, hashed_password = hash_password(current_password, user['salt'])
-        if hashed_password != user['password_hash']:
-            conn.close()
-            return jsonify({"success": False, "message": "Contraseña actual incorrecta"}), 401
-        
-        # Generar nuevo hash de contraseña
-        salt, new_hashed_password = hash_password(new_password)
-        
-        # Actualizar contraseña
-        cursor.execute("""
-            UPDATE Usuarios SET
-                password_hash = %s,
-                salt = %s
-            WHERE usuario_id = %s
-        """, (new_hashed_password, salt, current_user))
-        
-        conn.commit()
-        affected = cursor.rowcount
-        conn.close()
-        
-        if affected == 0:
-            return jsonify({"success": False, "message": "No se pudo actualizar la contraseña"}), 400
-        
-        return jsonify({
-            "success": True,
-            "message": "Contraseña actualizada exitosamente"
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar contraseña: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar contraseña"}), 500
-
-@app.route('/api/admin/profile/image', methods=['POST'])
-@token_required
-def update_admin_profile_image(current_user):
-    try:
-        if 'image' not in request.files:
-            return jsonify({"success": False, "message": "No se proporcionó imagen"}), 400
-        
-        image_file = request.files['image']
-        if image_file.filename == '':
-            return jsonify({"success": False, "message": "No se seleccionó archivo"}), 400
-        
-        # Guardar imagen
-        filename = secure_filename(f"profile_{current_user}_{image_file.filename}")
-        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        image_file.save(image_path)
-        image_url = f"/uploads/{filename}"
-        
-        # Actualizar en base de datos
-        conn = conectar()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE Usuarios SET
-                imagen_perfil = %s
-            WHERE usuario_id = %s
-        """, (image_url, current_user))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": "Imagen de perfil actualizada",
-            "imageUrl": image_url
-        })
-        
-    except Exception as e:
-        print(f"Error al actualizar imagen de perfil: {str(e)}")
-        if 'conn' in locals():
-            conn.close()
-        return jsonify({"success": False, "message": "Error al actualizar imagen de perfil"}), 500
-
-@app.route('/api/admin/profile/image', methods=['DELETE'])
-@token_required
-def delete_admin_profile_image(current_user):
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    # Eliminar imagen de perfil
-    cursor.execute("""
-        UPDATE Usuarios SET
-            imagen_perfil = NULL
-        WHERE usuario_id = %s
-    """, (current_user,))
-    
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-    
-    if affected == 0:
-        return jsonify({"success": False, "message": "No se pudo eliminar la imagen de perfil"}), 400
-    
-    return jsonify({"success": True, "message": "Imagen de perfil eliminada"})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

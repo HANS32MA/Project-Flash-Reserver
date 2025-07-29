@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Registro - Flash Reserver</title>
-  <link href="/frontend/assets/css/register.css" rel="stylesheet" />
-  <script type="module" src="/frontend/assets/js/auth.js"></script>
-  <link rel="icon" href="/frontend/assets/img/logo.png" type="image/png">
+  <link href="/assets/css/register.css" rel="stylesheet" />
+  <script type="module" src="/assets/js/auth.js"></script>
+  <link rel="icon" href="/assets/img/logo.png" type="image/png">
 </head>
 
 <body class="register-page">
@@ -35,12 +35,12 @@
     </form>
     
     <div class="links">
-      <a href="/frontend/auth/login.html">¿Ya tienes cuenta? Inicia sesión</a>
+      <a href=/auth/login.html>¿Ya tienes cuenta? Inicia sesión</a>
     </div>
   </div>
 
   <script type="module">
-    import { registerUser } from '/frontend/assets/js/auth.js';
+    import { registerUser } from '/assets/js/auth.js';
 
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();

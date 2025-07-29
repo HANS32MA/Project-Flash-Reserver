@@ -59,33 +59,29 @@ export async function loginUser(email, password) {
             throw new Error(data.message || 'Correo o contraseña incorrectos');
         }
 
-        // Generar token JWT (simulado)
-        const token = generateToken(data.user.id);
+        // Debug: Verificar datos recibidos
+        console.log("Datos recibidos del servidor:", data);
+
+        if (!data.token || !data.user) {
+            throw new Error('Datos de autenticación incompletos');
+        }
 
         // Almacenar token y datos del usuario
-        if (data.token && data.user) {
-            setAuthData(data.token, data.user);
-            
-            // Devolver también información de redirección
-            return {
-                ...data,
-                redirectPath: data.user.role === 'admin' 
-                    ? '/frontend/admin.html' 
-                    : '/frontend/inicio.html'
-            };
-        }
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
         
-        return data;
+        // Debug: Verificar rol
+        console.log("Rol del usuario:", data.user.role);
+        
+        return {
+            token: data.token,
+            user: data.user,
+            redirectPath: data.user.role === 'admin' ? '/admin.html' : '/inicio.html'
+        };
     } catch (error) {
-        console.error('Error en loginUser:', error);
+        console.error('Error en login:', error);
         throw error;
     }
-}
-
-// Función simulada para generar token JWT
-function generateToken(userId) {
-    // En un entorno real, esto lo haría el servidor
-    return `fake-jwt-token-for-user-${userId}`;
 }
 
 // Validar token
@@ -137,7 +133,6 @@ export function isAdmin() {
 export function isAuthenticated() {
     return !!getAuthToken();
 }
-
 
 // ----------Solicitar recuperación de contraseña--------------------
 export async function forgotPassword(email) {

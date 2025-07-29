@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login - Flash Reserver</title>
-  <link rel="stylesheet" href="/frontend/assets/css/login.css" />
-  <script type="module" src="/frontend/assets/js/auth.js"></script>
-  <link rel="icon" href="/frontend/assets/img/logo.png" type="image/png">
+  <link rel="stylesheet" href="/assets/css/login.css" />
+  <script type="module" src="/assets/js/auth.js"></script>
+  <link rel="icon" href="/assets/img/logo.png" type="image/png">
 </head>
 <body class="login-page">
   <div class="container">
@@ -32,101 +32,57 @@
     </form>
 
     <div class="form-text">
-          <a href="/frontend/auth/forgot-password.html">¿Olvidaste tu contraseña?</a>
+          <a href="/auth/forgot-password.html">¿Olvidaste tu contraseña?</a>
     </div>
 
     <div class="links">
-      <a href="/frontend/auth/register.html">¿No tienes cuenta? Regístrate</a>
+      <a href="/auth/register.html">¿No tienes cuenta? Regístrate</a>
     </div>
   </div>
 
   <script type="module">
-    import { loginUser } from '/frontend/assets/js/auth.js';
+    import { loginUser } from '/assets/js/auth.js';
 
-    // Configuración de rutas
-    const APP_ROUTES = {
-        adminDashboard: '/frontend/admin.html',
-        userDashboard: '/frontend/inicio.html',
-        login: '/frontend/auth/login.html'
-    };
-
-    // Elementos del DOM
-    const form = document.getElementById('loginForm');
-    const messageElement = document.getElementById('message');
-    const submitButton = form.querySelector('button[type="submit"]');
-    const loginText = document.getElementById('loginText');
-    const spinner = document.getElementById('loginSpinner');
-
-    // Función para verificar si una ruta existe
-    async function verifyRouteExists(path) {
-        try {
-            const response = await fetch(path, { method: 'HEAD' });
-            return response.ok;
-        } catch {
-            return false;
-        }
-    }
-
-    // Manejador del evento submit
-    form.addEventListener('submit', async (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-
-        // Obtener valores del formulario
+        
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const messageDiv = document.getElementById('message');
 
-        // Estado de carga
-        submitButton.disabled = true;
-        loginText.textContent = "Iniciando sesión...";
-        spinner.classList.remove('d-none');
-        messageElement.classList.add('d-none');
+        // Mostrar estado de carga
+        submitBtn.disabled = true;
+        messageDiv.textContent = "Verificando...";
+        messageDiv.className = "alert alert-info";
+        messageDiv.style.display = "block";
 
         try {
-            // Intentar login
             const result = await loginUser(email, password);
             
-            // Determinar ruta de redirección
-            let redirectPath = result.redirectPath || 
-                             (result.user.role === 'admin' 
-                              ? APP_ROUTES.adminDashboard 
-                              : APP_ROUTES.userDashboard);
-
-            // Verificar que la ruta existe
-            if (!await verifyRouteExists(redirectPath)) {
-                console.warn(`Ruta no encontrada: ${redirectPath}`);
-                redirectPath = APP_ROUTES.userDashboard; // Ruta por defecto
-            }
-
-            // Mostrar mensaje de éxito antes de redirigir
-            messageElement.textContent = "¡Inicio de sesión exitoso!";
-            messageElement.className = "alert alert-success";
-            messageElement.classList.remove("d-none");
-
-            // Redirigir después de breve delay
+            // Debug: Mostrar datos recibidos en consola
+            console.log("Resultado del login:", result);
+            console.log("Redirigiendo a:", result.redirectPath);
+            
+            
+            // Redirección basada en el rol
+            const redirectPath = result.user.role === 'admin' ? '/admin.html' : '/inicio.html';
+            console.log(`Redirigiendo a: ${redirectPath} (Rol: ${result.user.role})`);
+            
+            messageDiv.textContent = "¡Acceso correcto! Redirigiendo...";
+            messageDiv.className = "alert alert-success";
+            
+            // Redirigir después de 1 segundo
             setTimeout(() => {
                 window.location.href = redirectPath;
             }, 1000);
-
+            
         } catch (error) {
-            // Manejo de errores
-            messageElement.textContent = error.message || "Error al iniciar sesión";
-            messageElement.className = "alert alert-danger";
-            messageElement.classList.remove("d-none");
-
-            // Restaurar estado normal
-            submitButton.disabled = false;
-            loginText.textContent = "Ingresar";
-            spinner.classList.add('d-none');
+            console.error("Error en login:", error);
+            messageDiv.textContent = error.message || "Error al iniciar sesión";
+            messageDiv.className = "alert alert-danger";
+            submitBtn.disabled = false;
         }
-    });
-
-    // Opcional: Mostrar/ocultar contraseña
-    document.getElementById('togglePassword')?.addEventListener('click', function() {
-        const passwordInput = document.getElementById('password');
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        this.classList.toggle('bi-eye');
-        this.classList.toggle('bi-eye-slash');
     });
 </script>
 </body>
