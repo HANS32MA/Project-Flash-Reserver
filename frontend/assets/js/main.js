@@ -11,31 +11,30 @@ import {
 
 // Proteger rutas y manejar autenticación
 export async function protectRoutes() {
-    const publicPaths = ['/login.html', '/register.html', '/forgot.html', '/index.html'];
+    const publicPaths = ['/auth/login.html', '/auth/register.html', '/auth/forgot-password.html', '/index.html'];
     const currentPath = window.location.pathname;
     
     // Si es una ruta pública
     if (publicPaths.some(path => currentPath.endsWith(path))) {
         if (isAuthenticated()) {
             const user = getCurrentUser();
-            window.location.href = user.role === 'admin' ? '/admin.html' : '/inicio.html';
+            window.location.replace(user.role === 'admin' ? '/admin.html' : '/inicio.html');
         }
-        return;
     }
     
     // Validar token para rutas protegidas
     const validation = await validateToken();
     if (!validation || !validation.success) {
-        window.location.href = '/login.html?redirect=' + encodeURIComponent(currentPath);
+        logout(); // Limpia todo antes de redirigir
+        window.location.replace('/login.html?redirect=' + encodeURIComponent(currentPath));
         return;
     }
     
     // Verificar acceso a rutas de admin
     const adminPaths = ['/admin.html'];
     if (adminPaths.some(path => currentPath.endsWith(path)) && !isAdmin()) {
-        // 🔹 Si no es admin lo mandamos al login
-        logout();
-        window.location.href = '/auth/login.html';
+        logout(); // Limpia todo antes de redirigir
+        window.location.replace('/auth/login.html');
     }
 }
 
@@ -67,7 +66,7 @@ export function updateUserUI() {
 
 // Configurar eventos de autenticación
 export function setupAuthEvents() {
-    // Capturar botones logout por clase o ID
+        // Capturar botones logout
     const logoutButtons = [
         ...document.querySelectorAll('.logout-btn'),
         document.getElementById('logoutBtn'),
@@ -75,15 +74,14 @@ export function setupAuthEvents() {
     ].filter(Boolean);
 
     logoutButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (confirm('¿Estás seguro de cerrar sesión?')) {
-                logout();
-                window.location.href = '/auth/login.html';
-            }
-        });
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm('¿Estás seguro de cerrar sesión?')) {
+            logout(); // Usa replace() internamente
+        }
     });
-    
+});
+ 
     // Login Form
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
@@ -109,6 +107,8 @@ export function setupAuthEvents() {
             }
         });
     }
+}
+
     
     // Register Form
     const registerForm = document.getElementById('registerForm');
@@ -136,7 +136,7 @@ export function setupAuthEvents() {
             }
         });
     }
-}
+
 
 // Mostrar mensaje de error
 function showError(container, message) {

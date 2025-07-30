@@ -22,7 +22,7 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Límite de 16MB
-app.config['SECRET_KEY'] = 'tu_clave_secreta_super_segura'  # Cambia esto en producción!
+app.config['SECRET_KEY'] = 'zero5532'  # Cambia esto en producción!
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 @app.route('/')
@@ -73,6 +73,9 @@ def generate_token(user_id):
             'sub': user_id
         }
         return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+        if isinstance(token, bytes):
+            token = token.decode('utf-8')
+        return token
     except Exception as e:
         return e
 
@@ -81,12 +84,18 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization')
+        print("Token recibido:", token)  # <-- Para depuración
         if not token:
             return jsonify({'message': 'Token requerido'}), 401
+        if token.startswith('Bearer '):
+            token = token.split(' ')[1]
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             current_user = data['sub']
-        except:
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token expirado'}), 401
+        except Exception as e:
+            print('Error JWT:', e)
             return jsonify({'message': 'Token inválido o expirado'}), 401
         return f(current_user, *args, **kwargs)
     return decorated
@@ -307,7 +316,13 @@ def get_courts(current_user):
         SELECT cancha_id as id, nombre as name, descripcion as description,
                tipo as type, superficie as surface, techada as covered,
                capacidad as capacity, precio_hora as price, 
-               imagen_url as image, estado as status
+               imagen_url as image, estado as status,
+               CASE 
+                   WHEN estado = 'disponible' THEN 'Disponible'
+                   WHEN estado = 'mantenimiento' THEN 'En Mantenimiento'
+                   WHEN estado = 'inactiva' THEN 'Inactiva'
+                   ELSE estado
+               END as status_text
         FROM Canchas
         ORDER BY nombre
     """)
@@ -330,7 +345,13 @@ def get_court(current_user, court_id):
         SELECT cancha_id as id, nombre as name, descripcion as description,
                tipo as type, superficie as surface, techada as covered,
                capacidad as capacity, precio_hora as price, 
-               imagen_url as image, estado as status
+               imagen_url as image, estado as status,
+               CASE 
+                   WHEN estado = 'disponible' THEN 'Disponible'
+                   WHEN estado = 'mantenimiento' THEN 'En Mantenimiento'
+                   WHEN estado = 'inactiva' THEN 'Inactiva'
+                   ELSE estado
+               END as status_text
         FROM Canchas
         WHERE cancha_id = %s
     """, (court_id,))
@@ -359,23 +380,31 @@ def create_court(current_user):
             conn.close()
             return jsonify({"success": False, "message": "No autorizado"}), 403
 
-        # Obtener datos del formulario
-        data = request.form
+        # Obtener datos (pueden venir como form-data o JSON)
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
         
-        # Validar campos requeridos
-        required_fields = ['nombre', 'tipo', 'superficie', 'capacidad', 'precio_hora']
-        if not all(field in data for field in required_fields):
+        # Validar campos requeridos (aceptar tanto nombres en español como en inglés)
+        has_name = 'nombre' in data or 'name' in data
+        has_type = 'tipo' in data or 'type' in data
+        has_surface = 'superficie' in data or 'surface' in data
+        has_capacity = 'capacidad' in data or 'capacity' in data
+        has_price = 'precio_hora' in data or 'price' in data
+        
+        if not all([has_name, has_type, has_surface, has_capacity, has_price]):
             conn.close()
             return jsonify({"success": False, "message": "Faltan campos requeridos"}), 400
 
-        # Procesar datos
-        nombre = data['nombre']
-        descripcion = data.get('descripcion', '')
-        tipo = data['tipo']
-        superficie = data['superficie']
-        techada = 1 if 'techada' in data else 0
-        capacidad = int(data['capacidad'])
-        precio_hora = float(data['precio_hora'])
+        # Procesar datos (aceptar tanto nombres en español como en inglés)
+        nombre = data.get('nombre') or data.get('name')
+        descripcion = data.get('descripcion') or data.get('description', '')
+        tipo = data.get('tipo') or data.get('type')
+        superficie = data.get('superficie') or data.get('surface')
+        techada = 1 if data.get('techada', False) or data.get('covered', False) else 0
+        capacidad = int(data.get('capacidad') or data.get('capacity'))
+        precio_hora = float(data.get('precio_hora') or data.get('price'))
         estado = 'disponible'  # Estado por defecto
 
         # Procesar imagen
@@ -872,7 +901,13 @@ def get_users(current_user):
                    ELSE 'Usuario'
                END as role_text,
                DATE_FORMAT(created_at, '%%d/%%m/%%Y') as registration_date,
-               (SELECT COUNT(*) FROM Reservas WHERE usuario_id = Usuarios.usuario_id) as reservations_count
+               (SELECT COUNT(*) FROM Reservas WHERE usuario_id = Usuarios.usuario_id) as reservations_count,
+               CASE 
+                   WHEN estado = 'activo' THEN 'Activo'
+                   WHEN estado = 'inactivo' THEN 'Inactivo'
+                   WHEN estado = 'suspendido' THEN 'Suspendido'
+                   ELSE estado
+               END as status_text
         FROM Usuarios
     """
     
@@ -933,6 +968,225 @@ def get_user(current_user, user_id):
     
     conn.close()
     return jsonify({"success": True, "user": user})
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@token_required
+def update_user(current_user, user_id):
+    try:
+        data = request.get_json()
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE Usuarios 
+            SET nombre = %s, email = %s, documento_numero = %s, rol = %s
+            WHERE usuario_id = %s
+        """, (data['name'], data['email'], data['document'], data['role'], user_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Usuario actualizado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@token_required
+def delete_user(current_user, user_id):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        # Verificar si el usuario tiene reservas
+        cursor.execute("SELECT COUNT(*) FROM Reservas WHERE usuario_id = %s", (user_id,))
+        if cursor.fetchone()['count'] > 0:
+            return jsonify({'error': 'No se puede eliminar un usuario con reservas activas'}), 400
+        
+        cursor.execute("DELETE FROM Usuarios WHERE usuario_id = %s", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Usuario eliminado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== RUTAS PARA COMENTARIOS =====
+
+@app.route('/api/comments', methods=['GET'])
+@token_required
+def get_comments(current_user):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT co.comentario_id as id, c.nombre as court_name, u.nombre as user_name,
+                   co.calificacion as rating, co.comentario as comment, co.estado as status,
+                   DATE_FORMAT(co.fecha_comentario, '%d/%m/%Y %H:%i') as comment_date,
+                   co.respuesta_admin as admin_response,
+                   DATE_FORMAT(co.fecha_respuesta, '%d/%m/%Y %H:%i') as response_date,
+                   CASE 
+                       WHEN co.estado = 'activo' THEN 'Activo'
+                       WHEN co.estado = 'oculto' THEN 'Oculto'
+                       ELSE co.estado
+                   END as status_text
+            FROM Comentarios co
+            JOIN Canchas c ON co.cancha_id = c.cancha_id
+            JOIN Usuarios u ON co.usuario_id = u.usuario_id
+            ORDER BY co.fecha_comentario DESC
+        """)
+        
+        comments = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'comments': comments})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/comments/<int:comment_id>', methods=['PUT'])
+@token_required
+def update_comment(current_user, comment_id):
+    try:
+        data = request.get_json()
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE Comentarios 
+            SET estado = %s, respuesta_admin = %s, fecha_respuesta = NOW()
+            WHERE comentario_id = %s
+        """, (data['status'], data.get('admin_response'), comment_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Comentario actualizado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+@token_required
+def delete_comment(current_user, comment_id):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        cursor.execute("DELETE FROM Comentarios WHERE comentario_id = %s", (comment_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Comentario eliminado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== RUTAS PARA HORARIOS =====
+
+@app.route('/api/schedules', methods=['GET'])
+@token_required
+def get_schedules(current_user):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT h.horario_id as id, c.nombre as court_name, h.dia_semana as day,
+                   h.hora_inicio as start_time, h.hora_fin as end_time, h.disponible as available,
+                   DATE_FORMAT(h.created_at, '%d/%m/%Y') as created_date,
+                   CASE 
+                       WHEN h.disponible = 1 THEN 'Disponible'
+                       ELSE 'No Disponible'
+                   END as available_text
+            FROM Horarios h
+            JOIN Canchas c ON h.cancha_id = c.cancha_id
+            ORDER BY c.nombre, h.dia_semana, h.hora_inicio
+        """)
+        
+        schedules = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'schedules': schedules})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/schedules', methods=['POST'])
+@token_required
+def create_schedule(current_user):
+    try:
+        data = request.get_json()
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO Horarios (cancha_id, dia_semana, hora_inicio, hora_fin, disponible)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (data['court_id'], data['day'], data['start_time'], data['end_time'], data['available']))
+        
+        conn.commit()
+        schedule_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Horario creado correctamente', 'id': schedule_id})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/schedules/<int:schedule_id>', methods=['DELETE'])
+@token_required
+def delete_schedule(current_user, schedule_id):
+    try:
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        # Verificar si el horario tiene reservas
+        cursor.execute("SELECT COUNT(*) FROM Reservas WHERE horario_id = %s", (schedule_id,))
+        if cursor.fetchone()['count'] > 0:
+            return jsonify({'error': 'No se puede eliminar un horario con reservas activas'}), 400
+        
+        cursor.execute("DELETE FROM Horarios WHERE horario_id = %s", (schedule_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Horario eliminado correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== MEJORAR RUTAS EXISTENTES =====
+
+@app.route('/api/reservations/<int:reservation_id>', methods=['PUT'])
+@token_required
+def update_reservation(current_user, reservation_id):
+    try:
+        data = request.get_json()
+        conn = conectar()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE Reservas 
+            SET estado = %s
+            WHERE reserva_id = %s
+        """, (data['status'], reservation_id))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Reserva actualizada correctamente'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 ##-------------------Estadísticas------------------###
 @app.route('/api/stats/daily-reservations', methods=['GET'])
@@ -1032,13 +1286,18 @@ def dashboard_stats(current_user):
     cursor.execute("SELECT COUNT(*) as count FROM Usuarios")
     total_users = cursor.fetchone()['count']
     
+    # Reservas pendientes
+    cursor.execute("SELECT COUNT(*) as count FROM Reservas WHERE estado = 'pendiente'")
+    pending_reservations = cursor.fetchone()['count']
+    
     conn.close()
     
     return jsonify({
         "success": True,
         "todayReservations": today_reservations,
         "activeCourts": active_courts,
-        "totalUsers": total_users
+        "totalUsers": total_users,
+        "pendingReservations": pending_reservations
     })
 
 if __name__ == '__main__':

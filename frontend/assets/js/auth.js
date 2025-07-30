@@ -86,35 +86,39 @@ export async function loginUser(email, password) {
 
 // Validar token
 export async function validateToken() {
+    const token = getAuthToken();
+    if (!token) return false;
     try {
-        const token = getAuthToken();
-        if (!token) return null;
-
-        const response = await fetch(`${API_URL}/auth/validate-token`, {
+        const response = await fetch('http://127.0.0.1:5000/auth/validate-token', {
             method: 'GET',
             headers: {
-                'Authorization': token
+                'Authorization': `Bearer ${token}`
             }
         });
-
+        if (!response.ok) return false;
         const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Token inválido');
-        }
-
-        return data;
-    } catch (error) {
-        console.error('Error al validar token:', error);
-        logout();
-        return null;
+        return data.success || data.valid || true; // Ajusta según tu backend
+    } catch (e) {
+        return false;
     }
 }
 
 // Cerrar sesión
 export function logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
+    console.log('Ejecutando logout...'); // Para debug
+    
+    // Limpieza completa
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Elimina todas las cookies
+    document.cookie.split(';').forEach(cookie => {
+        document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
+    });
+
+    // Redirección forzada
+    window.location.href = '/auth/login.html';
+    window.location.reload(true);
 }
 
 // Obtener usuario actual
@@ -126,7 +130,8 @@ export function getCurrentUser() {
 // Verificar si es admin
 export function isAdmin() {
     const user = getCurrentUser();
-    return user && user.role === 'admin';
+    if (!user) return false;
+    return user.role === 'admin';
 }
 
 // Verificar autenticación
@@ -209,138 +214,4 @@ export async function resetPassword(token, newPassword) {
     }
 }
 
-// Obtener canchas disponibles
-export async function getCanchasDisponibles() {
-    try {
-        const token = getAuthToken();
-        if (!token) throw new Error('No autenticado');
 
-        const response = await fetch(`${API_URL}/api/canchas`, {
-            method: 'GET',
-            headers: {
-                'Authorization': token,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al obtener canchas');
-        }
-
-        return data.canchas;
-    } catch (error) {
-        console.error('Error en getCanchasDisponibles:', error);
-        throw error;
-    }
-}
-
-// Obtener horarios disponibles
-export async function getHorariosDisponibles(canchaId, fecha) {
-    try {
-        const token = getAuthToken();
-        if (!token) throw new Error('No autenticado');
-
-        const response = await fetch(`${API_URL}/api/horarios-disponibles?cancha_id=${canchaId}&fecha=${fecha}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': token,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al obtener horarios');
-        }
-
-        return data.horarios_disponibles;
-    } catch (error) {
-        console.error('Error en getHorariosDisponibles:', error);
-        throw error;
-    }
-}
-
-// Crear reserva
-export async function crearReserva(reservaData) {
-    try {
-        const token = getAuthToken();
-        if (!token) throw new Error('No autenticado');
-
-        const response = await fetch(`${API_URL}/api/reservas`, {
-            method: 'POST',
-            headers: {
-                'Authorization': token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(reservaData)
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al crear reserva');
-        }
-
-        return data;
-    } catch (error) {
-        console.error('Error en crearReserva:', error);
-        throw error;
-    }
-}
-
-// Obtener mis reservas
-export async function getMisReservas() {
-    try {
-        const token = getAuthToken();
-        if (!token) throw new Error('No autenticado');
-
-        const response = await fetch(`${API_URL}/api/mis-reservas`, {
-            method: 'GET',
-            headers: {
-                'Authorization': token,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al obtener reservas');
-        }
-
-        return data.reservas;
-    } catch (error) {
-        console.error('Error en getMisReservas:', error);
-        throw error;
-    }
-}
-
-// Cancelar reserva
-export async function cancelarReserva(reservaId) {
-    try {
-        const token = getAuthToken();
-        if (!token) throw new Error('No autenticado');
-
-        const response = await fetch(`${API_URL}/api/reservas/${reservaId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': token,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.message || 'Error al cancelar reserva');
-        }
-
-        return data;
-    } catch (error) {
-        console.error('Error en cancelarReserva:', error);
-        throw error;
-    }
-}

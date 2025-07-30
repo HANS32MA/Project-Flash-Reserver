@@ -64,17 +64,12 @@
             console.log("Resultado del login:", result);
             console.log("Redirigiendo a:", result.redirectPath);
             
-            
-            // Redirección basada en el rol
-            const redirectPath = result.user.role === 'admin' ? '/admin.html' : '/inicio.html';
-            console.log(`Redirigiendo a: ${redirectPath} (Rol: ${result.user.role})`);
-            
             messageDiv.textContent = "¡Acceso correcto! Redirigiendo...";
             messageDiv.className = "alert alert-success";
             
             // Redirigir después de 1 segundo
             setTimeout(() => {
-                window.location.href = redirectPath;
+                window.location.replace(result.redirectPath);
             }, 1000);
             
         } catch (error) {
@@ -84,6 +79,14 @@
             submitBtn.disabled = false;
         }
     });
+
+    // Limpiar campos si viene de logout
+    const urlParams = new URLSearchParams(window.location.search);
+    if(urlParams.has('logout')) {
+        document.getElementById('email').value = '';
+        document.getElementById('password').value = '';
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 </script>
 </body>
 </html>
